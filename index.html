@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>全民参保数智动员手机看板</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>全民参保数智动员</h1>
+      <p>重庆市九龙坡区 · 手机看板</p>
+    </header>
+
+    <main class="container">
+      <section class="card">
+        <div class="card-title-row">
+          <h2>层级筛选</h2>
+          <span class="tag" id="currentLevelLabel">区级</span>
+        </div>
+        <div class="tabs" id="levelTabs">
+          <button class="tab active" data-level="district">区级</button>
+          <button class="tab" data-level="town">镇街</button>
+          <button class="tab" data-level="village">村居</button>
+        </div>
+        <label for="regionSelect" class="label">行政区划</label>
+        <select id="regionSelect"></select>
+      </section>
+
+      <section class="card" id="overviewCard">
+        <h2>全局总览 · 目标完成</h2>
+        <div class="metrics-grid" id="overviewMetrics"></div>
+      </section>
+
+      <section class="card">
+        <h2>各区域参保情况（排名）</h2>
+        <div id="regionRanking" class="list"></div>
+      </section>
+
+      <section class="card">
+        <h2>参保结构 · 人群特征</h2>
+        <div class="subtabs" id="populationTabs">
+          <button class="subtab active" data-group="employee">职工</button>
+          <button class="subtab" data-group="resident">居民</button>
+        </div>
+        <div id="populationFeature"></div>
+      </section>
+
+      <section class="card">
+        <h2>户籍/居住属性分析</h2>
+        <div id="residenceAnalysis" class="kv-list"></div>
+      </section>
+
+      <section class="card">
+        <h2>参保风险 & 异常监测</h2>
+        <div class="risk-summary" id="riskSummary"></div>
+        <div class="subtabs" id="riskTabs">
+          <button class="subtab active" data-risk="high">高风险</button>
+          <button class="subtab" data-risk="medium">中风险</button>
+        </div>
+        <div id="riskList" class="list"></div>
+      </section>
+
+      <section class="card">
+        <h2>暂停参保原因及流向分析</h2>
+        <div id="suspendFlow" class="kv-list"></div>
+      </section>
+
+      <section class="card">
+        <h2>基层动员看板</h2>
+        <div class="metrics-grid" id="grassrootsMetrics"></div>
+        <h3>待办动员提醒（按风险优先）</h3>
+        <div id="todoList" class="list"></div>
+      </section>
+
+      <section class="card">
+        <h2>精准动员名单（指标穿透）</h2>
+        <div class="subtabs" id="targetTabs">
+          <button class="subtab active" data-target="resident">居民名单</button>
+          <button class="subtab" data-target="enterprise">企业名单</button>
+        </div>
+        <div class="filters">
+          <input id="searchInput" type="search" placeholder="输入姓名/企业名/证件号后4位" />
+          <select id="sortSelect">
+            <option value="risk">按风险等级</option>
+            <option value="days">按断缴时长</option>
+            <option value="age">按年龄</option>
+          </select>
+        </div>
+        <div id="targetList" class="list"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
