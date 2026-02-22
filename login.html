@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>看板登录入口</title>
+  <style>
+    :root {
+      --bg-shell: #17181c;
+      --bg-app: #f3f5f8;
+      --line: #dbe2ec;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #2563eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg-shell);
+      font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      min-height: 100dvh;
+      padding: 10px 0;
+    }
+    .app {
+      width: min(480px, 100vw - 20px);
+      min-height: 100dvh;
+      background: var(--bg-app);
+      border-radius: 28px;
+      padding: 16px 14px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 20px 50px rgba(0,0,0,.35);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .main {
+      background: #fff;
+      border: 1px solid #e7edf7;
+      border-radius: 20px;
+      padding: 14px;
+      background-image: linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .title-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .title { font-size: 22px; font-weight: 800; }
+    .ver {
+      font-size: 11px;
+      color: #7a8da8;
+      font-weight: 600;
+      padding-bottom: 2px;
+      white-space: nowrap;
+    }
+    .region {
+      font-size: 13px;
+      color: #315ea8;
+      margin-top: 4px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .region svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 46px 0 24px;
+      text-align: center;
+      transform: translateY(56px);
+    }
+    .grid {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+      transform: translateY(-20px);
+    }
+    .entry {
+      border: 1px solid var(--line);
+      background: linear-gradient(120deg, #f8fbff 0%, #f2f6fc 100%);
+      border-radius: 16px;
+      padding: 12px 14px;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 106px;
+      width: 68%;
+      max-width: 320px;
+      transition: all .18s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .entry:hover { border-color: #93c5fd; background: #eff6ff; transform: translateY(-1px); }
+    .entry::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+      border-radius: 16px 0 0 16px;
+      background: #93c5fd;
+    }
+    .entry.district::before { background: #93c5fd; }
+    .entry.street::before { background: #86efac; }
+    .entry.village::before { background: #fcd34d; }
+    .entry.gridder::before { background: #9fb8c7; }
+    .left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .icon {
+      width: 30px;
+      height: 30px;
+      color: #2563eb;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+    }
+    .icon svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .info { min-width: 0; }
+    .entry .n { font-size: 14px; font-weight: 800; color: #1e293b; }
+    .entry .u { margin-top: 3px; font-size: 11px; color: var(--muted); line-height: 1.45; }
+    .entry .go {
+      font-size: 11px;
+      color: var(--primary);
+      font-weight: 700;
+      white-space: nowrap;
+      padding: 0 4px;
+    }
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      color: #6b7b93;
+      padding: 10px 0 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="main">
+      <div class="title-row">
+        <div class="title">全民参保数智动员手机看板</div>
+        <div class="ver">V2.0</div>
+      </div>
+      <div class="region">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        重庆市九龙坡区
+      </div>
+      <div class="sub">请选择登录角色后进入看板</div>
+      <div class="grid">
+        <button class="entry district" data-id="district_leader">
+          <div class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3v7"/><path d="M7.5 7.5h9"/><path d="M5 21h14"/><path d="M7 21V11h10v10"/><path d="M10 15h4"/></svg>
+            </span>
+            <div class="info">
+              <div class="n">区医保局领导</div>
+              <div class="u">重庆市九龙坡区医保局</div>
+            </div>
+          </div>
+          <div class="go">进入看板 ›</div>
+        </button>
+        <button class="entry street" data-id="street_leader">
+          <div class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5"/><path d="M6 9.5V20h12V9.5"/><path d="M9 20v-6h6v6"/><path d="M10 8h4"/></svg>
+            </span>
+            <div class="info">
+              <div class="n">镇街分管领导</div>
+              <div class="u">石桥铺街道社保所</div>
+            </div>
+          </div>
+          <div class="go">进入看板 ›</div>
+        </button>
+        <button class="entry village" data-id="village_leader">
+          <div class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M6 20V9l6-4 6 4v11"/><path d="M9 12h6"/><path d="M10 20v-4h4v4"/></svg>
+            </span>
+            <div class="info">
+              <div class="n">村居领导</div>
+              <div class="u">渝州路社区居委会</div>
+            </div>
+          </div>
+          <div class="go">进入看板 ›</div>
+        </button>
+        <button class="entry gridder" data-id="grid_worker">
+          <div class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4z"/><path d="M13 4h7v7h-7z"/><path d="M4 13h7v7H4z"/><path d="M13 13h7v7h-7z"/></svg>
+            </span>
+            <div class="info">
+              <div class="n">网格员</div>
+              <div class="u">渝州路社区第3网格</div>
+            </div>
+          </div>
+          <div class="go">进入看板 ›</div>
+        </button>
+      </div>
+      <div class="footer">重庆市九龙坡区医疗保障中心</div>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll(".entry").forEach(el => {
+      el.onclick = () => {
+        location.href = `./index.html?identity=${encodeURIComponent(el.dataset.id)}`;
+      };
+    });
+  </script>
+</body>
+</html>
