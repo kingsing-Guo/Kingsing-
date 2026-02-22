@@ -975,8 +975,26 @@
         width: 100vw;
         min-height: 100dvh;
         border-radius: 0;
-        padding: 0 0 92px;
+        padding: 0 4px 92px;
         box-shadow: none;
+      }
+      .key-stat .t2 {
+        white-space: nowrap;
+        font-size: 11px;
+      }
+      .staff-pies {
+        grid-template-columns: 1fr;
+      }
+      .staff-pie-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+      }
+      .staff-pie-item .left {
+        min-width: 0;
+      }
+      .staff-pie-item .v {
+        white-space: nowrap;
       }
       .bottom-nav {
         width: 100vw;
