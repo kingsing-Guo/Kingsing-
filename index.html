@@ -1420,6 +1420,41 @@
       }
     };
 
+    const API_BASE = (JSON.parse(localStorage.getItem("dashboard_session") || "{}").apiBase) || localStorage.getItem("dashboard_api_base") || "http://127.0.0.1:8787";
+    let apiToken = (JSON.parse(localStorage.getItem("dashboard_session") || "{}").token) || "";
+
+    function mergeProfileToIdentity(identity, profile) {
+      if (!identityProfiles[identity] || !profile) return;
+      identityProfiles[identity] = {
+        ...identityProfiles[identity],
+        label: profile.label || identityProfiles[identity].label,
+        userName: profile.userName || identityProfiles[identity].userName,
+        unit: profile.unit || identityProfiles[identity].unit,
+        roles: Array.isArray(profile.roles) && profile.roles.length ? profile.roles : identityProfiles[identity].roles,
+        levels: Array.isArray(profile.levels) && profile.levels.length ? profile.levels : identityProfiles[identity].levels,
+        street: profile.street ?? identityProfiles[identity].street,
+        village: profile.village ?? identityProfiles[identity].village
+      };
+    }
+
+    async function loadBootstrapFromApi() {
+      if (!apiToken) return false;
+      const resp = await fetch(`${API_BASE}/api/bootstrap?year=${encodeURIComponent(state.insuranceYear)}`, {
+        headers: { Authorization: `Bearer ${apiToken}` }
+      });
+      if (!resp.ok) return false;
+      const json = await resp.json();
+      if (!json.ok || !json.dashboard || !Array.isArray(json.dashboard.streets)) return false;
+      data.district = json.dashboard.district || data.district;
+      data.streets = json.dashboard.streets;
+      if (json.profile && json.profile.identity && identityProfiles[json.profile.identity]) {
+        state.identity = json.profile.identity;
+        state.role = (json.profile.roles || ["leader"])[0];
+        mergeProfileToIdentity(state.identity, json.profile);
+      }
+      return true;
+    }
+
     // 条件筛选固定口径字典：分组顺序与子标签保持不变（与穿透指标无关）
     const FIXED_TAG_SCHEMA = [
       { group: "人员性别", tags: ["男", "女"] },
@@ -1531,7 +1566,7 @@
       if (!st.villages.some(v => v.name === state.village)) state.village = st.villages[0].name;
     }
 
-    function getStreetObj(name = state.street) { return data.streets.find(s => s.name === name) || data.streets[0]; }
+    function getStreetObj(name = state.street) { return data.streets.find(s => s.name === name) || data.streets[0] || { name: "", villages: [] }; }
     function sumNodes(nodes) { return nodes.reduce((a, n) => { a.target += n.target; a.current += n.current; a.residents.push(...n.residents); a.enterprises.push(...n.enterprises); return a; }, { target: 0, current: 0, residents: [], enterprises: [] }); }
     function aggregateStreet(street) { const b = sumNodes(street.villages); return { ...b, name: street.name }; }
     function aggregateDistrict() { const b = sumNodes(data.streets.flatMap(s => s.villages)); return { ...b, name: data.district }; }
@@ -2695,7 +2730,14 @@
     document.getElementById("backLoginBtn").onclick = () => { location.href = "./login.html"; };
     els.overlay.onclick = closeDrawer;
     els.levelSelect.onchange = () => { state.level = els.levelSelect.value; render(); };
-    els.yearSelect.onchange = () => { state.insuranceYear = Number(els.yearSelect.value); render(); };
+    els.yearSelect.onchange = async () => {
+      state.insuranceYear = Number(els.yearSelect.value);
+      const ok = await loadBootstrapFromApi();
+      if (!ok) {
+        console.warn("[API] 年度切换未获取到后端数据，继续使用当前内存数据渲染。");
+      }
+      render();
+    };
     els.streetSelect.onchange = () => { state.street = els.streetSelect.value; state.village = getStreetObj().villages[0].name; render(); };
     els.villageSelect.onchange = () => { state.village = els.villageSelect.value; render(); };
     els.drawerType.onchange = () => { updateQueryPlaceholders(); renderConditionPanel(); renderDrawerList(); };
@@ -2719,14 +2761,29 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    const q = new URLSearchParams(location.search);
-    const id = q.get("identity");
-    if (!id || !identityProfiles[id]) {
-      location.href = "./login.html";
-    } else {
-      state.identity = id;
+    async function initApp() {
+      const q = new URLSearchParams(location.search);
+      const id = q.get("identity");
+      const session = JSON.parse(localStorage.getItem("dashboard_session") || "{}");
+      const sessionIdentity = session.identity;
+      const initialIdentity =
+        (id && identityProfiles[id] ? id : null) ||
+        (sessionIdentity && identityProfiles[sessionIdentity] ? sessionIdentity : null);
+
+      if (!initialIdentity) {
+        location.href = "./login.html";
+        return;
+      }
+
+      state.identity = initialIdentity;
+      const ok = await loadBootstrapFromApi();
+      if (!ok) {
+        console.warn("[API] 启动未获取到后端数据，使用本地模拟数据渲染。");
+      }
+      render();
     }
-    render();
+
+    initApp();
   </script>
 </body>
 </html>

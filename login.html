@@ -246,9 +246,48 @@
     </div>
   </div>
   <script>
+    const API_BASE = localStorage.getItem("dashboard_api_base") || "http://127.0.0.1:8787";
+    const LOGIN_MAP = {
+      district_leader: { username: "district", password: "123456" },
+      street_leader: { username: "street", password: "123456" },
+      village_leader: { username: "village", password: "123456" },
+      grid_worker: { username: "grid", password: "123456" }
+    };
+
+    async function doLogin(identity) {
+      const cred = LOGIN_MAP[identity];
+      if (!cred) throw new Error("未配置登录账号");
+      const resp = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cred)
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok || !json.token) {
+        throw new Error(json.message || "登录失败");
+      }
+      localStorage.setItem("dashboard_session", JSON.stringify({
+        token: json.token,
+        identity,
+        user: json.user || null,
+        apiBase: API_BASE,
+        loginAt: Date.now()
+      }));
+      location.href = `./index.html?identity=${encodeURIComponent(identity)}`;
+    }
+
     document.querySelectorAll(".entry").forEach(el => {
-      el.onclick = () => {
-        location.href = `./index.html?identity=${encodeURIComponent(el.dataset.id)}`;
+      el.onclick = async () => {
+        const old = el.querySelector(".go").textContent;
+        el.querySelector(".go").textContent = "登录中...";
+        el.disabled = true;
+        try {
+          await doLogin(el.dataset.id);
+        } catch (e) {
+          alert(`登录失败：${e.message}\n请先启动后端：${API_BASE}`);
+          el.querySelector(".go").textContent = old;
+          el.disabled = false;
+        }
       };
     });
   </script>
