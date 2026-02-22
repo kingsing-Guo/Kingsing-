@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1500" viewBox="0 0 2200 1500">
+  <defs>
+    <style>
+      .title{font:700 44px "PingFang SC","Microsoft YaHei",sans-serif;fill:#0f172a}
+      .sub{font:500 22px "PingFang SC","Microsoft YaHei",sans-serif;fill:#475569}
+      .boxTitle{font:700 30px "PingFang SC","Microsoft YaHei",sans-serif;fill:#0f172a}
+      .boxItem{font:500 24px "PingFang SC","Microsoft YaHei",sans-serif;fill:#1e293b}
+      .small{font:500 20px "PingFang SC","Microsoft YaHei",sans-serif;fill:#475569}
+      .arrowLabel{font:600 20px "PingFang SC","Microsoft YaHei",sans-serif;fill:#0369a1}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,4 L0,8 z" fill="#3b82f6"/>
+    </marker>
+    <marker id="arrowWarn" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,4 L0,8 z" fill="#ea580c"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="2200" height="1500" fill="#f8fafc"/>
+  <text x="60" y="80" class="title">全民参保数智动员看板 - 指标关系图（A3汇报版）</text>
+  <text x="60" y="120" class="sub">重庆市九龙坡区 · 目标-完成-差距-动员机会主链路 + 结构分析 + 风险监测 + 基层执行</text>
+
+  <!-- Row 1 -->
+  <rect x="60" y="180" rx="18" ry="18" width="500" height="220" fill="#e0f2fe" stroke="#7dd3fc" stroke-width="2"/>
+  <text x="90" y="230" class="boxTitle">目标体系</text>
+  <text x="90" y="275" class="boxItem">• 参保目标总人数</text>
+  <text x="130" y="315" class="boxItem">- 职工保目标人数</text>
+  <text x="130" y="350" class="boxItem">- 居民保目标人数</text>
+
+  <rect x="620" y="180" rx="18" ry="18" width="500" height="220" fill="#dcfce7" stroke="#86efac" stroke-width="2"/>
+  <text x="650" y="230" class="boxTitle">达成体系</text>
+  <text x="650" y="275" class="boxItem">• 已完成参保人数</text>
+  <text x="690" y="315" class="boxItem">- 职工保已完成人数</text>
+  <text x="690" y="350" class="boxItem">- 居民保已完成人数</text>
+
+  <rect x="1180" y="180" rx="18" ry="18" width="500" height="220" fill="#ffedd5" stroke="#fdba74" stroke-width="2"/>
+  <text x="1210" y="230" class="boxTitle">差距体系</text>
+  <text x="1210" y="275" class="boxItem">• 目标差距人数</text>
+  <text x="1250" y="315" class="boxItem">- 职工保差距人数</text>
+  <text x="1250" y="350" class="boxItem">- 居民保差距人数</text>
+
+  <rect x="1740" y="180" rx="18" ry="18" width="400" height="220" fill="#ede9fe" stroke="#c4b5fd" stroke-width="2"/>
+  <text x="1770" y="230" class="boxTitle">进度体系</text>
+  <text x="1770" y="275" class="boxItem">• 总完成率</text>
+  <text x="1770" y="315" class="boxItem">• 职工保完成率</text>
+  <text x="1770" y="350" class="boxItem">• 居民保完成率</text>
+
+  <!-- arrows row1 -->
+  <line x1="560" y1="290" x2="620" y2="290" stroke="#3b82f6" stroke-width="4" marker-end="url(#arrow)"/>
+  <text x="576" y="278" class="arrowLabel">推进</text>
+  <line x1="1120" y1="290" x2="1180" y2="290" stroke="#3b82f6" stroke-width="4" marker-end="url(#arrow)"/>
+  <text x="1138" y="278" class="arrowLabel">形成</text>
+  <line x1="930" y1="400" x2="930" y2="470" stroke="#3b82f6" stroke-width="4" marker-end="url(#arrow)"/>
+  <text x="955" y="445" class="arrowLabel">计算完成率</text>
+
+  <!-- Row 2 -->
+  <rect x="60" y="500" rx="18" ry="18" width="700" height="280" fill="#f0fdf4" stroke="#86efac" stroke-width="2"/>
+  <text x="90" y="550" class="boxTitle">动员机会体系（居民保）</text>
+  <text x="90" y="595" class="boxItem">• 居民保可动员总人数</text>
+  <text x="130" y="635" class="boxItem">- 存量可动员人数</text>
+  <text x="130" y="670" class="boxItem">- 增量可动员人数</text>
+  <text x="90" y="720" class="small">规则：可动员总人数 与 居民保差距联动评估风险</text>
+
+  <rect x="820" y="500" rx="18" ry="18" width="860" height="280" fill="#eff6ff" stroke="#93c5fd" stroke-width="2"/>
+  <text x="850" y="550" class="boxTitle">存量巩固与增量扩面</text>
+  <text x="850" y="595" class="boxItem">• 存量总数 = 存量已参保(续保) + 存量未参保(可动员) + 存量减员(已确认)</text>
+  <text x="850" y="635" class="boxItem">• 新增参保(扩面) = 去年未参保或外区参保，今年在辖区内参保</text>
+  <text x="850" y="675" class="boxItem">• 可扩增量(优先) = 去年未参保或外区参保，今年尚未参保</text>
+  <text x="850" y="725" class="small">用于支撑“居民保可动员总人数”</text>
+
+  <rect x="1740" y="500" rx="18" ry="18" width="400" height="280" fill="#fff7ed" stroke="#fdba74" stroke-width="2"/>
+  <text x="1770" y="550" class="boxTitle">预警判定</text>
+  <text x="1770" y="595" class="boxItem">• 若 可动员总人数 &lt; 居民保差距</text>
+  <text x="1770" y="635" class="boxItem">  → 任务完成存在风险</text>
+  <text x="1770" y="675" class="boxItem">• 若 可动员总人数 ≥ 居民保差距</text>
+  <text x="1770" y="715" class="boxItem">  → 任务仍有完成机会</text>
+
+  <line x1="760" y1="620" x2="820" y2="620" stroke="#3b82f6" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="1680" y1="620" x2="1740" y2="620" stroke="#ea580c" stroke-width="4" marker-end="url(#arrowWarn)"/>
+
+  <!-- Row 3 -->
+  <rect x="60" y="860" rx="18" ry="18" width="680" height="260" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="90" y="910" class="boxTitle">结构分析体系</text>
+  <text x="90" y="955" class="boxItem">• 户籍参保情况分析（四维）</text>
+  <text x="90" y="995" class="boxItem">• 性别年龄分布分析</text>
+  <text x="90" y="1035" class="boxItem">• 重点对象参保分析</text>
+  <text x="90" y="1075" class="boxItem">• 职工参保情况分析</text>
+
+  <rect x="780" y="860" rx="18" ry="18" width="640" height="260" fill="#fff7ed" stroke="#fdba74" stroke-width="2"/>
+  <text x="810" y="910" class="boxTitle">风险监测体系</text>
+  <text x="810" y="955" class="boxItem">• 高风险企业</text>
+  <text x="810" y="995" class="boxItem">• 中风险企业</text>
+  <text x="810" y="1035" class="boxItem">• 职工减员流向（转居民保/申请停保/跨区转出）</text>
+  <text x="810" y="1075" class="small">风险企业与异常流向均支持下钻明细</text>
+
+  <rect x="1460" y="860" rx="18" ry="18" width="680" height="260" fill="#ecfeff" stroke="#67e8f9" stroke-width="2"/>
+  <text x="1490" y="910" class="boxTitle">基层执行体系（村居/网格）</text>
+  <text x="1490" y="955" class="boxItem">• 本村居目标(居民保) / 已参保(居民保) / 目标差距</text>
+  <text x="1490" y="995" class="boxItem">• 待动员名单：存量未参保(可动员) + 可扩增量(优先)</text>
+  <text x="1490" y="1035" class="boxItem">• 重点资助对象待动员（与存量/增量交叉）</text>
+  <text x="1490" y="1075" class="small">可动员&lt;目标差距时触发基层预警</text>
+
+  <!-- Bottom row -->
+  <rect x="60" y="1180" rx="18" ry="18" width="2080" height="220" fill="#eef2ff" stroke="#a5b4fc" stroke-width="2"/>
+  <text x="90" y="1230" class="boxTitle">区域参保情况排名（下级单位）</text>
+  <text x="90" y="1275" class="boxItem">• 总参保：任务数 / 完成数 / 完成率</text>
+  <text x="760" y="1275" class="boxItem">• 职工保：任务数 / 完成数 / 完成率</text>
+  <text x="1430" y="1275" class="boxItem">• 居民保：任务数 / 完成数 / 完成率</text>
+  <text x="90" y="1320" class="small">支持按“总完成率 / 职工保完成率 / 居民保完成率”排序，完成数可下钻</text>
+
+  <line x1="1700" y1="1120" x2="1700" y2="1180" stroke="#3b82f6" stroke-width="4" marker-end="url(#arrow)"/>
+
+</svg>

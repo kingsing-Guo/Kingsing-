@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2600" height="1900" viewBox="0 0 2600 1900">
+  <defs>
+    <style>
+      .title{font:700 46px "PingFang SC","Microsoft YaHei",sans-serif;fill:#0f172a}
+      .sub{font:500 22px "PingFang SC","Microsoft YaHei",sans-serif;fill:#475569}
+      .h{font:700 30px "PingFang SC","Microsoft YaHei",sans-serif;fill:#0f172a}
+      .t{font:500 22px "PingFang SC","Microsoft YaHei",sans-serif;fill:#1e293b}
+      .s{font:500 19px "PingFang SC","Microsoft YaHei",sans-serif;fill:#64748b}
+      .al{font:600 18px "PingFang SC","Microsoft YaHei",sans-serif;fill:#0369a1}
+    </style>
+    <marker id="arr" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,4 L0,8 z" fill="#3b82f6"/>
+    </marker>
+    <marker id="arr2" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,4 L0,8 z" fill="#0ea5e9"/>
+    </marker>
+  </defs>
+  <rect width="2600" height="1900" fill="#f8fafc"/>
+  <text x="50" y="75" class="title">全民参保数智动员看板 - 指标关系图（完整版）</text>
+  <text x="50" y="112" class="sub">覆盖：核心指标、区域排名、存量增量、户籍/年龄性别、重点对象、职工参保、风险监测、基层任务</text>
+
+  <!-- 核心链路 -->
+  <rect x="50" y="150" rx="16" ry="16" width="760" height="320" fill="#eef6ff" stroke="#93c5fd" stroke-width="2"/>
+  <text x="80" y="195" class="h">核心指标概览（总链路）</text>
+  <text x="80" y="240" class="t">参保目标总人数 = 职工保目标 + 居民保目标</text>
+  <text x="80" y="280" class="t">已完成参保人数 = 职工保已完成 + 居民保已完成</text>
+  <text x="80" y="320" class="t">目标差距 = 目标总人数 - 已完成参保人数</text>
+  <text x="80" y="360" class="t">完成率：总完成率 / 职工保完成率 / 居民保完成率</text>
+  <text x="80" y="400" class="t">居民保可动员人数 = 存量可动员 + 增量可动员</text>
+  <text x="80" y="440" class="s">判断：可动员人数 &lt; 居民保差距 → 风险预警</text>
+
+  <rect x="860" y="150" rx="16" ry="16" width="520" height="320" fill="#f0fdf4" stroke="#86efac" stroke-width="2"/>
+  <text x="890" y="195" class="h">存量巩固与增量扩面</text>
+  <text x="890" y="240" class="t">存量总数</text>
+  <text x="930" y="275" class="t">- 存量已参保（续保）</text>
+  <text x="930" y="310" class="t">- 存量未参保（可动员）</text>
+  <text x="930" y="345" class="t">- 存量减员（已确认）</text>
+  <text x="890" y="385" class="t">增量：</text>
+  <text x="930" y="420" class="t">- 新增参保（扩面）</text>
+  <text x="930" y="455" class="t">- 可扩增量（优先）</text>
+
+  <line x1="810" y1="310" x2="860" y2="310" stroke="#3b82f6" stroke-width="4" marker-end="url(#arr)"/>
+  <text x="820" y="300" class="al">来源支撑</text>
+
+  <!-- 排名 -->
+  <rect x="1430" y="150" rx="16" ry="16" width="1120" height="320" fill="#eef2ff" stroke="#a5b4fc" stroke-width="2"/>
+  <text x="1460" y="195" class="h">区域参保情况排名（下级单位）</text>
+  <text x="1460" y="240" class="t">支持排序：总参保完成率 / 职工保完成率 / 居民保完成率</text>
+  <text x="1460" y="285" class="t">每单位展示：</text>
+  <text x="1500" y="320" class="t">总参保：任务数、完成人数、完成率</text>
+  <text x="1500" y="355" class="t">职工保：任务数、完成人数、完成率</text>
+  <text x="1500" y="390" class="t">居民保：任务数、完成人数、完成率</text>
+  <text x="1460" y="435" class="s">完成人数可穿透；任务数/差距类不穿透</text>
+
+  <!-- 结构分析 -->
+  <rect x="50" y="520" rx="16" ry="16" width="820" height="400" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="80" y="565" class="h">户籍参保情况分析（四维）</text>
+  <text x="80" y="610" class="t">1. 辖区户籍总人口：已参保/未参保（含占比）</text>
+  <text x="80" y="650" class="t">2. 已参保户籍人口：本区县/市内外区/市外参保</text>
+  <text x="80" y="690" class="t">3. 未参保户籍人口：本辖区/区内其他辖区/市内外区/市外居住</text>
+  <text x="80" y="730" class="t">4. 非户籍居住总人口：已参保/未参保（含占比）</text>
+  <text x="80" y="775" class="s">所有人数支持穿透列表</text>
+
+  <rect x="900" y="520" rx="16" ry="16" width="760" height="400" fill="#ecfeff" stroke="#67e8f9" stroke-width="2"/>
+  <text x="930" y="565" class="h">性别年龄分布分析</text>
+  <text x="930" y="610" class="t">性别结构：男 / 女（人数、占比）</text>
+  <text x="930" y="650" class="t">年龄段：16岁及以下、16-30、31-45、46-60、60岁以上</text>
+  <text x="930" y="690" class="t">每年龄段：总人数、占比、参保率</text>
+  <text x="930" y="730" class="t">支持年龄+性别联合下钻筛选</text>
+  <text x="930" y="775" class="s">防呆：18岁以下不分配职工保</text>
+
+  <rect x="1690" y="520" rx="16" ry="16" width="860" height="400" fill="#fff7ed" stroke="#fdba74" stroke-width="2"/>
+  <text x="1720" y="565" class="h">重点对象参保分析</text>
+  <text x="1720" y="610" class="t">新生儿（0~1岁）/ 中小学生（6~18岁）/ 高校生（16~30岁）/ 资助对象</text>
+  <text x="1720" y="650" class="t">每类展示：总人数、已参保人数与占比、未参保人数与占比</text>
+  <text x="1720" y="690" class="t">资助对象细类：低保对象 / 残疾对象 / 特困对象</text>
+  <text x="1720" y="730" class="t">支持按类型穿透明细</text>
+  <text x="1720" y="775" class="s">重点对象与存量/增量待动员人群存在交叉</text>
+
+  <!-- 职工+风险 -->
+  <rect x="50" y="970" rx="16" ry="16" width="1240" height="420" fill="#eef6ff" stroke="#93c5fd" stroke-width="2"/>
+  <text x="80" y="1015" class="h">职工参保情况分析</text>
+  <text x="80" y="1060" class="t">参保职工分布（大类+细类）：</text>
+  <text x="120" y="1095" class="t">大类：单位参保 / 个人参保（灵活就业）</text>
+  <text x="120" y="1130" class="t">细类：在职职工、单位退休人员、灵活就业（一档/二档）、个人退休（一档/二档）</text>
+  <text x="80" y="1170" class="t">参保单位分布：</text>
+  <text x="120" y="1205" class="t">全辖区单位总数、参加职工保单位数（占比、环比）、未参加职工保单位数（占比、环比）</text>
+  <text x="80" y="1245" class="s">图形：双饼图（单位 vs 个人、在职 vs 单位退休）+卡片明细</text>
+  <text x="80" y="1285" class="s">所有数量与穿透明细保持一致</text>
+
+  <rect x="1320" y="970" rx="16" ry="16" width="1230" height="420" fill="#fff1f2" stroke="#fda4af" stroke-width="2"/>
+  <text x="1350" y="1015" class="h">参保风险与异常监测</text>
+  <text x="1350" y="1060" class="t">企业风险预警：高风险企业 / 中风险企业</text>
+  <text x="1350" y="1100" class="t">监测条件示例：欠费断缴、参保差异率、缴费基数做实率等</text>
+  <text x="1350" y="1140" class="t">职工减员流向：转居民保 / 申请停保 / 跨区转出</text>
+  <text x="1350" y="1180" class="t">对应企业列表、居民列表可穿透</text>
+  <text x="1350" y="1220" class="s">预警卡片与列表筛选标签组名称保持口径一致</text>
+
+  <!-- 基层 -->
+  <rect x="50" y="1435" rx="16" ry="16" width="2500" height="390" fill="#f0fdf4" stroke="#86efac" stroke-width="2"/>
+  <text x="80" y="1480" class="h">基层执行（村居/网格员视角）</text>
+  <text x="80" y="1525" class="t">村居任务概览：本村居目标（居民保） / 已参保（居民保） / 目标差距（居民保） / 完成进度 / 昨日新增</text>
+  <text x="80" y="1565" class="t">待动员名单：可动员人数（存量未参保 + 可增量动员）及预警判断</text>
+  <text x="80" y="1605" class="t">存量未参保（可动员）按户籍-居住关系分解：户在人在 / 户在人不在 / 人在户不在 / 人户均不在</text>
+  <text x="80" y="1645" class="t">可扩增量（优先）按户籍-居住关系分解：户在人在 / 户在人不在 / 人在户不在</text>
+  <text x="80" y="1685" class="t">重点资助对象（待动员）按低保对象 / 残疾对象 / 特困对象展示数量与占比</text>
+  <text x="80" y="1725" class="s">规则联动：可动员人数 &lt; 目标差距（居民保）触发预警；与领导看板同口径同数据</text>
+  <text x="80" y="1765" class="s">列表条件筛选固定标签组，支持对象类型（居民/企业）与组合筛选</text>
+
+  <!-- connectors -->
+  <line x1="430" y1="470" x2="430" y2="520" stroke="#3b82f6" stroke-width="4" marker-end="url(#arr2)"/>
+  <line x1="1240" y1="470" x2="1240" y2="520" stroke="#3b82f6" stroke-width="4" marker-end="url(#arr2)"/>
+  <line x1="2010" y1="470" x2="2010" y2="520" stroke="#3b82f6" stroke-width="4" marker-end="url(#arr2)"/>
+
+  <line x1="670" y1="920" x2="670" y2="970" stroke="#3b82f6" stroke-width="4" marker-end="url(#arr2)"/>
+  <line x1="2110" y1="920" x2="2110" y2="970" stroke="#3b82f6" stroke-width="4" marker-end="url(#arr2)"/>
+
+  <line x1="1290" y1="1180" x2="1320" y2="1180" stroke="#3b82f6" stroke-width="4" marker-end="url(#arr)"/>
+  <line x1="1300" y1="1390" x2="1300" y2="1435" stroke="#3b82f6" stroke-width="4" marker-end="url(#arr)"/>
+  <text x="1325" y="1418" class="al">风险与任务联动下沉</text>
+</svg>

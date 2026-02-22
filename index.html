@@ -2198,7 +2198,7 @@
             <span class="add-num">昨日新增 <span class="pct-highlight ok">${unitText(yesterdayAdded, "人")}</span></span>
           </div>
         </div>
-        <div class="card"><div class="label">目标差距（居民保）</div><div class="value">${unitText(diff, "人")}</div></div>
+        <div class="card"><div class="label">目标差距（居民保）</div><div class="value gap-num">${unitText(diff, "人")}</div></div>
         <div class="card"><div class="label">完成进度</div><div class="value"><span class="pct-highlight ok">${pct}%</span></div><div class="progress"><span style="width:${Math.min(Number(pct),100)}%"></span></div></div>`;
       els.workerOverview.querySelectorAll(".clickable").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
 
