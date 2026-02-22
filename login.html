@@ -80,14 +80,14 @@
     .sub {
       font-size: 12px;
       color: var(--muted);
-      margin: 46px 0 24px;
+      margin: 56px 0 20px;
       text-align: center;
-      transform: translateY(56px);
+      transform: none;
     }
     .api-bar {
-      margin: 0 auto 8px;
-      transform: translateY(52px);
-      width: min(420px, calc(100vw - 56px));
+      margin: 10px auto 0;
+      width: 68%;
+      max-width: 320px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -120,11 +120,11 @@
       width: 100%;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
       align-items: center;
       gap: 14px;
       flex: 1;
-      transform: translateY(-20px);
+      transform: none;
     }
     .entry {
       border: 1px solid var(--line);
@@ -209,6 +209,10 @@
         width: calc(100vw - 48px);
         max-width: none;
       }
+      .api-bar {
+        width: calc(100vw - 48px);
+        max-width: none;
+      }
     }
   </style>
 </head>
@@ -224,10 +228,6 @@
         重庆市九龙坡区
       </div>
       <div class="sub">请选择登录角色后进入看板</div>
-      <div class="api-bar">
-        <div id="apiText" class="api-text"></div>
-        <button id="apiSetBtn" class="api-btn" type="button">设置</button>
-      </div>
       <div class="grid">
         <button class="entry district" data-id="district_leader">
           <div class="left">
@@ -277,6 +277,10 @@
           </div>
           <div class="go">进入看板 ›</div>
         </button>
+      </div>
+      <div class="api-bar">
+        <div id="apiText" class="api-text"></div>
+        <button id="apiSetBtn" class="api-btn" type="button">设置</button>
       </div>
       <div class="footer">重庆市九龙坡区医疗保障中心</div>
     </div>
