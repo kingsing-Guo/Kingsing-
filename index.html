@@ -1093,10 +1093,10 @@
       const defs = [
         { key: "在职职工", big: "单位参保", w: STAFF_CONFIG.detailRatio.onjob },
         { key: "单位退休人员", big: "单位参保", w: STAFF_CONFIG.detailRatio.orgRetired },
-        { key: "灵活就业（一档）", big: "个人参保", w: STAFF_CONFIG.detailRatio.flex1 },
-        { key: "灵活就业（二档）", big: "个人参保", w: STAFF_CONFIG.detailRatio.flex2 },
-        { key: "个人退休（一档）", big: "个人参保", w: STAFF_CONFIG.detailRatio.personRetired1 },
-        { key: "个人退休（二档）", big: "个人参保", w: STAFF_CONFIG.detailRatio.personRetired2 }
+        { key: "灵活就业（一档）", big: "个人参保（灵活就业）", w: STAFF_CONFIG.detailRatio.flex1 },
+        { key: "灵活就业（二档）", big: "个人参保（灵活就业）", w: STAFF_CONFIG.detailRatio.flex2 },
+        { key: "个人退休（一档）", big: "个人参保（灵活就业）", w: STAFF_CONFIG.detailRatio.personRetired1 },
+        { key: "个人退休（二档）", big: "个人参保（灵活就业）", w: STAFF_CONFIG.detailRatio.personRetired2 }
       ];
       const total = defs.reduce((s, d) => s + Math.max(d.w || 0, 0), 0) || 1;
       let p = seededRand(seed);
@@ -1245,6 +1245,26 @@
         gapResident: false
       }
     };
+
+    // 条件筛选固定口径字典：分组顺序与子标签保持不变（与穿透指标无关）
+    const FIXED_TAG_SCHEMA = [
+      { group: "对象类型标签", tags: ["居民", "企业"] },
+      { group: "层级", tags: ["区级", "镇街", "村居"] },
+      { group: "居民户籍", tags: ["本区户籍", "非本区户籍"] },
+      { group: "居民居住", tags: ["本区居住", "外区居住"] },
+      { group: "居民居住细分", tags: ["本辖区", "区内其他辖区", "市内外区", "市外"] },
+      { group: "参保地", tags: ["本区县参保", "市内外区参保", "市外参保"] },
+      { group: "今年参保类型", tags: ["居民保", "职工保", "未参保"] },
+      { group: "存量变化类型", tags: ["存量续保", "可动员", "停保", "死亡", "辖区外参保", "转职工保（含灵活就业参保）"] },
+      { group: "存量减员原因", tags: ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"] },
+      { group: "职工减员流向", tags: ["转居民保", "申请停保", "跨区转出"] },
+      { group: "重点对象", tags: ["新生儿", "中小学生", "高校生", "资助对象"] },
+      { group: "资助对象细类", tags: ["低保对象", "残疾对象", "特困对象"] },
+      { group: "职工参保大类", tags: ["单位参保", "个人参保（灵活就业）"] },
+      { group: "职工参保细类", tags: ["在职职工", "单位退休人员", "灵活就业（一档）", "灵活就业（二档）", "个人退休（一档）", "个人退休（二档）"] },
+      { group: "企业风险等级", tags: ["高", "中", "低"] },
+      { group: "单位参保状态", tags: ["参加职工保", "未参加职工保"] }
+    ];
 
     const els = {
       userNameText: document.getElementById("userNameText"),
@@ -1904,10 +1924,10 @@
       const detailDefs = [
         { key: "在职职工", big: "单位参保", mode: "staff_detail_onjob" },
         { key: "单位退休人员", big: "单位参保", mode: "staff_detail_org_retired" },
-        { key: "灵活就业（一档）", big: "个人参保", mode: "staff_detail_flex_1" },
-        { key: "灵活就业（二档）", big: "个人参保", mode: "staff_detail_flex_2" },
-        { key: "个人退休（一档）", big: "个人参保", mode: "staff_detail_person_retired_1" },
-        { key: "个人退休（二档）", big: "个人参保", mode: "staff_detail_person_retired_2" }
+        { key: "灵活就业（一档）", big: "个人参保（灵活就业）", mode: "staff_detail_flex_1" },
+        { key: "灵活就业（二档）", big: "个人参保（灵活就业）", mode: "staff_detail_flex_2" },
+        { key: "个人退休（一档）", big: "个人参保（灵活就业）", mode: "staff_detail_person_retired_1" },
+        { key: "个人退休（二档）", big: "个人参保（灵活就业）", mode: "staff_detail_person_retired_2" }
       ];
       const totalStaffPeople = staffDone;
       const weights = detailDefs.map(d => {
@@ -1958,7 +1978,7 @@
               <div class="staff-pie" style="--seg:${byBigSplit};--c1:#3b82f6;--c2:#10b981;"></div>
               <div class="staff-pie-legend">
                 <div class="staff-pie-item" data-drill="staff_big_unit"><span class="left"><span class="dot c1"></span><span class="k">单位参保</span></span><span class="v">${unitText(byBig.unit, "人")} <span class="pct-highlight">${ratio(byBig.unit, Math.max(totalStaffPeople, 1))}%</span></span></div>
-                <div class="staff-pie-item" data-drill="staff_big_personal"><span class="left"><span class="dot c2"></span><span class="k">个人参保</span></span><span class="v">${unitText(byBig.personal, "人")} <span class="pct-highlight">${ratio(byBig.personal, Math.max(totalStaffPeople, 1))}%</span></span></div>
+                <div class="staff-pie-item" data-drill="staff_big_personal"><span class="left"><span class="dot c2"></span><span class="k">个人参保（灵活就业）</span></span><span class="v">${unitText(byBig.personal, "人")} <span class="pct-highlight">${ratio(byBig.personal, Math.max(totalStaffPeople, 1))}%</span></span></div>
               </div>
             </div>
             <div class="staff-pie-card">
@@ -2133,7 +2153,7 @@
         resident_done: x => x.type === "居民" && x.thisYearPaid,
         staff_people_all: x => x.type === "居民" && x.thisYearType === "职工保",
         staff_big_unit: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffBigType === "单位参保",
-        staff_big_personal: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffBigType === "个人参保",
+        staff_big_personal: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffBigType === "个人参保（灵活就业）",
         staff_detail_onjob: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffDetailType === "在职职工",
         staff_detail_org_retired: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffDetailType === "单位退休人员",
         staff_detail_flex_1: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffDetailType === "灵活就业（一档）",
@@ -2322,43 +2342,34 @@
       if (mode.startsWith("risk_") || mode.startsWith("staff_unit_")) out.type = "企业";
       if (mode.startsWith("flow_") || mode.startsWith("age_") || mode.startsWith("key_") || mode.startsWith("hh_") || mode.startsWith("loss_") || mode.startsWith("worker_") || mode.startsWith("stock_") || mode.startsWith("inc_")) out.type = "居民";
       const map = {
-        risk_high: ["高风险"],
-        risk_medium: ["中风险"],
+        risk_high: ["高"],
+        risk_medium: ["中"],
         flow_resident: ["转居民保"],
         flow_pause: ["申请停保"],
         flow_transfer: ["跨区转出"],
-        stock_uninsured: ["存量未参保（可动员）"],
-        stock_unpaid: ["存量未参保（可动员）"],
-        worker_stock_unpaid: ["存量未参保（可动员）"],
-        worker_increment_potential: ["今年未参保"],
-        worker_done_resident: ["今年参保"]
+        stock_uninsured: ["可动员"],
+        stock_unpaid: ["可动员"],
+        worker_stock_unpaid: ["可动员"],
+        worker_increment_potential: ["未参保"],
+        worker_done_resident: ["居民保"]
       };
       if (mode.startsWith("age_")) out.tags = [mode.replace("age_", "")];
       if (mode.startsWith("loss_")) out.tags = [mode.replace("loss_", "")];
-      if (mode.startsWith("key_insured_")) out.tags = [mode.replace("key_insured_", ""), "今年参保"];
-      if (mode.startsWith("key_uninsured_")) out.tags = [mode.replace("key_uninsured_", ""), "今年未参保"];
+      if (mode.startsWith("key_insured_")) out.tags = [mode.replace("key_insured_", ""), "居民保"];
+      if (mode.startsWith("key_uninsured_")) out.tags = [mode.replace("key_uninsured_", ""), "未参保"];
       if (mode.startsWith("key_") && !mode.startsWith("key_insured_") && !mode.startsWith("key_uninsured_")) out.tags = [mode.replace("key_", "")];
       if (map[mode]) out.tags = [...map[mode]];
       return out;
     }
 
-    function getTagGroups(items) {
+    function getTagGroups() {
       const groups = {};
-      items.forEach(i => {
-        getTags(i).forEach(t => {
-          const g = t.group || "其他";
-          if (!groups[g]) groups[g] = new Set();
-          groups[g].add(t.text);
-        });
-      });
-      return Object.fromEntries(Object.entries(groups).map(([k, set]) => [k, [...set].sort((a, b) => a.localeCompare(b, "zh-CN"))]));
+      FIXED_TAG_SCHEMA.forEach(x => { groups[x.group] = [...x.tags]; });
+      return groups;
     }
 
     function renderConditionPanel() {
-      const baseItems = getDrawerItems(state.drawer);
-      const t = els.drawerType.value || "all";
-      const items = t === "all" ? baseItems : baseItems.filter(i => i.type === t);
-      const groups = getTagGroups(items);
+      const groups = getTagGroups();
       const html = Object.keys(groups).length === 0
         ? '<div class="mini">暂无可选标签</div>'
         : Object.entries(groups).map(([g, tags]) => `
@@ -2438,28 +2449,35 @@
     }
 
     function getTags(x) {
+      const levelText = state.level === "district" ? "区级" : (state.level === "street" ? "镇街" : "村居");
       if (x.type === "居民") {
+        const thisYearType = x.thisYearType || (x.thisYearPaid ? "居民保" : "未参保");
+        const stockType = x.stockChangeType || "";
+        const keyType = x.keyGroup !== "无" ? x.keyGroup : "";
         return [
-          { text: x.gender, level: "ok", group: "人员属性" },
-          { text: x.ageGroup, level: "", group: "人员属性" },
-          { text: x.household, level: "", group: "户籍属性" },
-          { text: x.residenceDetail || x.residence, level: "", group: "居住属性" },
-          ...(x.insuredPlace ? [{ text: x.insuredPlace, level: "ok", group: "参保去向" }] : []),
-          ...(x.hardshipType ? [{ text: x.hardshipType, level: "warn", group: "重点属性" }] : []),
-          ...(x.thisYearType === "职工保" ? [{ text: "职工保", level: "ok", group: "险种属性" }, { text: x.staffBigType || "职工参保", level: "", group: "险种属性" }, { text: x.staffDetailType || "细类未分", level: "", group: "险种属性" }] : []),
-          { text: x.keyGroup !== "无" ? x.keyGroup : "普通", level: x.keyGroup !== "无" ? "warn" : "", group: "重点属性" },
-          { text: x.lastYearPaid ? "去年参保" : "去年未参保", level: x.lastYearPaid ? "ok" : "", group: "参保状态" },
-          { text: x.thisYearPaid ? "今年参保" : "今年未参保", level: x.thisYearPaid ? "ok" : "danger", group: "参保状态" },
-          ...(x.reason ? [{ text: x.reason, level: x.thisYearPaid ? "ok" : "warn", group: "业务属性" }] : []),
-          ...(x.pauseFlow ? [{ text: x.pauseFlow, level: "warn", group: "停保流向" }] : []),
-          ...(x.lossReason ? [{ text: x.lossReason, level: "danger", group: "减员原因" }] : [])
+          { text: "居民", level: "ok", group: "对象类型标签" },
+          { text: levelText, level: "", group: "层级" },
+          { text: x.household, level: "", group: "居民户籍" },
+          { text: x.residence, level: "", group: "居民居住" },
+          { text: x.residenceDetail || x.residence, level: "", group: "居民居住细分" },
+          ...(x.insuredPlace ? [{ text: x.insuredPlace, level: "ok", group: "参保地" }] : []),
+          { text: thisYearType, level: thisYearType === "未参保" ? "danger" : "ok", group: "今年参保类型" },
+          ...(stockType ? [{ text: stockType, level: stockType === "可动员" ? "warn" : "", group: "存量变化类型" }] : []),
+          ...(x.lossReason ? [{ text: x.lossReason, level: "danger", group: "存量减员原因" }] : []),
+          ...(x.pauseFlow ? [{ text: x.pauseFlow, level: "warn", group: "职工减员流向" }] : []),
+          ...(keyType ? [{ text: keyType, level: "warn", group: "重点对象" }] : []),
+          ...(x.hardshipType ? [{ text: x.hardshipType, level: "warn", group: "资助对象细类" }] : []),
+          ...(x.thisYearType === "职工保" ? [
+            { text: x.staffBigType || "单位参保", level: "", group: "职工参保大类" },
+            { text: x.staffDetailType || "在职职工", level: "", group: "职工参保细类" }
+          ] : [])
         ];
       }
       return [
-        { text: x.industry + "业", level: "", group: "企业属性" },
-        { text: x.scale + "规模", level: "", group: "企业属性" },
-        { text: x.staffInsured ? "已参加职工保单位" : "未参加职工保单位", level: x.staffInsured ? "ok" : "warn", group: "参保状态" },
-        { text: x.risk + "风险", level: x.risk === "高" ? "danger" : (x.risk === "中" ? "warn" : "ok"), group: "风险等级" },
+        { text: "企业", level: "ok", group: "对象类型标签" },
+        { text: levelText, level: "", group: "层级" },
+        { text: x.staffInsured ? "参加职工保" : "未参加职工保", level: x.staffInsured ? "ok" : "warn", group: "单位参保状态" },
+        { text: x.risk, level: x.risk === "高" ? "danger" : (x.risk === "中" ? "warn" : "ok"), group: "企业风险等级" },
         { text: x.reason, level: x.risk === "高" ? "danger" : "warn", group: "风险原因" },
         { text: "欠费" + (x.duration || 0) + "月", level: "warn", group: "风险原因" }
       ];
