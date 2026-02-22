@@ -267,7 +267,8 @@
     .label { font-size: 11px; color: var(--muted); }
     .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
     .mini { font-size: 11px; color: var(--muted); margin-top: 4px; }
-    .num-value { font-size: inherit; line-height: 1; }
+    .num-wrap { display: inline-flex; align-items: baseline; gap: 1px; white-space: nowrap; max-width: 100%; }
+    .num-value { font-size: inherit; line-height: 1; font-variant-numeric: tabular-nums; }
     .num-unit { font-size: .58em; margin-left: 2px; color: var(--muted); font-weight: 600; }
     b .num-unit { font-size: .62em; }
     .progress { margin-top: 6px; height: 7px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
@@ -404,11 +405,15 @@
       font-weight: 800;
       color: #0f172a;
       line-height: 1.1;
+      white-space: nowrap;
     }
     .sketch-main .main-sub {
       font-size: 12px;
       color: #64748b;
       font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .sketch-main.warn .main-value {
       color: #c2410c;
@@ -440,6 +445,7 @@
       color: #0f172a;
       font-weight: 800;
       cursor: pointer;
+      white-space: nowrap;
     }
     .sketch-line .line-rate {
       color: #475569;
@@ -791,7 +797,7 @@
     .dot.c2 { background:#10b981; }
     .dot.c3 { background:#f59e0b; }
     .staff-pie-item .k { font-size:11px; color:#64748b; }
-    .staff-pie-item .v { font-size:12px; font-weight:700; color:#0f172a; }
+    .staff-pie-item .v { font-size:12px; font-weight:700; color:#0f172a; white-space: nowrap; }
     .staff-chip {
       border:1px solid #dbe2ec;
       border-radius:12px;
@@ -800,9 +806,11 @@
       cursor:pointer;
     }
     .staff-chip .k { font-size:11px; color:#64748b; }
-    .staff-chip .v { margin-top:4px; font-size:13px; font-weight:700; color:#0f172a; }
+    .staff-chip .v { margin-top:4px; font-size:13px; font-weight:700; color:#0f172a; display:flex; align-items:baseline; gap:4px; flex-wrap:nowrap; white-space: nowrap; }
     .staff-chip .v .pct-highlight { margin-left:4px; }
     .pct-highlight.neg { color:#b45309; }
+    .staff-chip .trend-note { margin-top:2px; font-size:11px; color:#94a3b8; font-weight:500; line-height:1.2; white-space: nowrap; }
+    .staff-chip .trend-note .trend-label { color:#94a3b8; font-weight:500; margin-right:2px; }
     .stock-group {
       border: 1px solid #dbe2ec;
       border-radius: 14px;
@@ -849,7 +857,7 @@
       cursor: pointer;
     }
     .todo-mini .k { font-size: 11px; color: #64748b; }
-    .todo-mini .v { margin-top: 3px; font-size: 13px; font-weight: 700; color: #0f172a; }
+    .todo-mini .v { margin-top: 3px; font-size: 13px; font-weight: 700; color: #0f172a; white-space: nowrap; }
     .progress:hover > span,
     .age-item:hover .progress > span,
     .hh-card:hover .hh-fill { animation: barGrow .65s ease-out both; }
@@ -1064,6 +1072,9 @@
       .staff-pies {
         grid-template-columns: 1fr;
       }
+      .staff-grid.two {
+        grid-template-columns: 1fr;
+      }
       .staff-pie-item {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -1074,6 +1085,29 @@
       }
       .staff-pie-item .v {
         white-space: nowrap;
+      }
+      .sketch-body {
+        grid-template-columns: 1fr;
+      }
+      .sketch-main .main-value {
+        font-size: clamp(24px, 8vw, 32px);
+      }
+      .sketch-line .line-label,
+      .sketch-line .line-only,
+      .sketch-line .line-head {
+        white-space: nowrap;
+      }
+      .sketch-line .line-value {
+        font-size: 11px;
+      }
+      .sketch-line .line-rate {
+        font-size: 10px;
+      }
+      .todo-subgrid.three {
+        grid-template-columns: repeat(2, minmax(0,1fr));
+      }
+      .todo-mini .v {
+        font-size: 12px;
       }
       .gauge-trend {
         font-size: 9px;
@@ -1268,6 +1302,7 @@
       const hukouStreet = ["杨家坪正街", "石桥铺渝州路", "西彭铝城大道", "九龙园区大道", "科园一路"];
       const liveStreet = ["天兴路", "前进路", "团结路", "渝州路", "高新区路", "科园一路"];
 
+      let underageStaffCorrected = 0;
       const residents = Array.from({ length: Math.max(Math.floor(uninsured * 0.7), 24) }, (_, i) => {
         const age = (i * 4) % 76;
         const gender = i % 2 === 0 ? "男" : "女";
@@ -1289,7 +1324,12 @@
         const lastYearPaid = i % 5 !== 0;
         const lastYearLocalPaid = lastYearPaid && (i % 4 !== 0);
         const thisYearPaid = i % 6 !== 0;
-        const thisYearType = thisYearPaid ? (i % 5 === 0 ? "职工保" : "居民保") : "未参保";
+        let thisYearType = thisYearPaid ? ((age >= 18 && i % 5 === 0) ? "职工保" : "居民保") : "未参保";
+        // 防呆校验：未满18周岁不得归入职工保，自动纠正为居民保
+        if (age < 18 && thisYearType === "职工保") {
+          thisYearType = "居民保";
+          underageStaffCorrected += 1;
+        }
         let staffBigType = "";
         let staffDetailType = "";
         if (thisYearType === "职工保") {
@@ -1337,6 +1377,9 @@
           place: name
         };
       });
+      if (underageStaffCorrected > 0) {
+        console.warn(`[口径校验] ${name} 自动纠正 ${underageStaffCorrected} 条“<18岁且职工保”为“居民保”。`);
+      }
 
       const enterprises = Array.from({ length: Math.max(Math.floor(uninsured * 0.3), 8) }, (_, i) => {
         const risk = i % 3 === 0 ? "高" : (i % 3 === 1 ? "中" : "低");
@@ -1389,8 +1432,7 @@
 
     // 条件筛选固定口径字典：分组顺序与子标签保持不变（与穿透指标无关）
     const FIXED_TAG_SCHEMA = [
-      { group: "对象类型标签", tags: ["居民", "企业"] },
-      { group: "层级", tags: ["区级", "镇街", "村居"] },
+      { group: "人员性别", tags: ["男", "女"] },
       { group: "居民户籍", tags: ["本区户籍", "非本区户籍"] },
       { group: "居民居住", tags: ["本区居住", "外区居住"] },
       { group: "居民居住细分", tags: ["本辖区", "区内其他辖区", "市内外区", "市外"] },
@@ -1505,7 +1547,14 @@
     function aggregateDistrict() { const b = sumNodes(data.streets.flatMap(s => s.villages)); return { ...b, name: data.district }; }
     function currentNode() { if (state.level === "district") return aggregateDistrict(); if (state.level === "street") return aggregateStreet(getStreetObj()); const st = getStreetObj(); return st.villages.find(v => v.name === state.village) || st.villages[0]; }
     function ratio(a, b) { return b ? ((a / b) * 100).toFixed(1) : "0.0"; }
-    function unitText(v, unit) { return `<span class="num-value">${Number(v || 0).toLocaleString()}</span><span class="num-unit">${unit}</span>`; }
+    function unitText(v, unit) {
+      const n = Number(v || 0);
+      if ((unit === "人" || unit === "家") && Math.abs(n) >= 100000) {
+        const wan = (n / 10000).toFixed(1);
+        return `<span class="num-wrap"><span class="num-value">${wan}</span><span class="num-unit">万${unit}</span></span>`;
+      }
+      return `<span class="num-wrap"><span class="num-value">${n.toLocaleString()}</span><span class="num-unit">${unit}</span></span>`;
+    }
     function computeCoreMetrics(node) {
       const done = node.current;
       const target = node.target;
@@ -1911,14 +1960,22 @@
           ${ageDetail.map(a => `
             <div class="age-item clickable" data-drill="age_${a.label}">
               <div class="age-head">
-                <div class="age-title">${a.label}<span class="age-share">占总人数 ${a.share}%</span></div>
-                <div class="age-stats"><div class="age-total">${unitText(a.count, "人")}</div><div class="age-rate">${a.insureRate}% 参保率</div></div>
+                <div class="age-title">${a.label}<span class="age-share">占比 ${a.share}%</span></div>
+                <div class="age-stats"><div class="age-total">${unitText(a.count, "人")}</div><div class="age-rate">${a.insureRate}%</div></div>
               </div>
               <div class="progress"><span style="width:${a.share}%;background:${a.color}"></span></div>
-              <div class="age-meta"><div class="m">男: ${unitText(a.m, "人")}</div><div class="f">女: ${unitText(a.f, "人")}</div></div>
+              <div class="age-meta">
+                <div class="m clickable" data-drill="age_gender|${a.label}|男">男: ${unitText(a.m, "人")}</div>
+                <div class="f clickable" data-drill="age_gender|${a.label}|女">女: ${unitText(a.f, "人")}</div>
+              </div>
             </div>`).join("")}
         </div>`;
-      els.structurePanel.querySelectorAll(".clickable").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+      els.structurePanel.querySelectorAll(".clickable").forEach(el => {
+        el.onclick = (e) => {
+          if (el.closest(".age-meta")) e.stopPropagation();
+          openDrawer(el.dataset.drill);
+        };
+      });
     }
 
     function renderHousehold(node) {
@@ -2119,7 +2176,7 @@
               <div class="staff-pie" style="--seg:${byBigSplit};--c1:#3b82f6;--c2:#10b981;"></div>
               <div class="staff-pie-legend">
                 <div class="staff-pie-item" data-drill="staff_big_unit"><span class="left"><span class="dot c1"></span><span class="k">单位参保</span></span><span class="v">${unitText(byBig.unit, "人")} <span class="pct-highlight">${ratio(byBig.unit, Math.max(totalStaffPeople, 1))}%</span></span></div>
-                <div class="staff-pie-item" data-drill="staff_big_personal"><span class="left"><span class="dot c2"></span><span class="k">个人参保（灵活就业）</span></span><span class="v">${unitText(byBig.personal, "人")} <span class="pct-highlight">${ratio(byBig.personal, Math.max(totalStaffPeople, 1))}%</span></span></div>
+                <div class="staff-pie-item" data-drill="staff_big_personal"><span class="left"><span class="dot c2"></span><span class="k">个人参保</span></span><span class="v">${unitText(byBig.personal, "人")} <span class="pct-highlight">${ratio(byBig.personal, Math.max(totalStaffPeople, 1))}%</span></span></div>
               </div>
             </div>
             <div class="staff-pie-card">
@@ -2132,7 +2189,7 @@
             </div>
           </div>
           <div class="staff-grid two" style="margin-top:8px">
-            ${detailStats.filter(d => !["在职职工", "单位退休人员"].includes(d.key)).map(d => `<div class="staff-chip" data-drill="${d.mode}"><div class="k">${d.big} · ${d.key}</div><div class="v">${unitText(d.count, "人")} <span class="pct-highlight">${ratio(d.count, Math.max(totalStaffPeople, 1))}%</span></div></div>`).join("")}
+            ${detailStats.filter(d => !["在职职工", "单位退休人员"].includes(d.key)).map(d => `<div class="staff-chip" data-drill="${d.mode}"><div class="k">${d.key}</div><div class="mini">${d.big}</div><div class="v">${unitText(d.count, "人")} <span class="pct-highlight">${ratio(d.count, Math.max(totalStaffPeople, 1))}%</span></div></div>`).join("")}
           </div>
         </div>
         <div class="staff-block">
@@ -2141,11 +2198,13 @@
           <div class="staff-grid two" style="margin-top:8px">
             <div class="staff-chip" data-drill="staff_unit_insured">
               <div class="k">参加职工保单位</div>
-              <div class="v">${unitText(unitsInsured, "家")} <span class="pct-highlight">${ratio(unitsInsured, Math.max(unitsTotal, 1))}%</span> <span class="${momCls(unitsInsured, unitsInsuredLastMonth)}">环比 ${mom(unitsInsured, unitsInsuredLastMonth)}</span></div>
+              <div class="v">${unitText(unitsInsured, "家")} <span class="pct-highlight">${ratio(unitsInsured, Math.max(unitsTotal, 1))}%</span></div>
+              <div class="trend-note"><span class="trend-label">环比</span><span class="${momCls(unitsInsured, unitsInsuredLastMonth)}">${mom(unitsInsured, unitsInsuredLastMonth)}</span></div>
             </div>
             <div class="staff-chip" data-drill="staff_unit_uninsured">
               <div class="k">未参加职工保单位</div>
-              <div class="v">${unitText(unitsUninsured, "家")} <span class="pct-highlight warn">${ratio(unitsUninsured, Math.max(unitsTotal, 1))}%</span> <span class="${momCls(unitsUninsured, unitsUninsuredLastMonth)}">环比 ${mom(unitsUninsured, unitsUninsuredLastMonth)}</span></div>
+              <div class="v">${unitText(unitsUninsured, "家")} <span class="pct-highlight warn">${ratio(unitsUninsured, Math.max(unitsTotal, 1))}%</span></div>
+              <div class="trend-note"><span class="trend-label">环比</span><span class="${momCls(unitsUninsured, unitsUninsuredLastMonth)}">${mom(unitsUninsured, unitsUninsuredLastMonth)}</span></div>
             </div>
           </div>
         </div>`;
@@ -2285,6 +2344,13 @@
       const enterprises = n.enterprises;
       const all = [...residents, ...enterprises];
       if (mode === "resident_done" || mode === "worker_done_resident") return residentDoneListByMetric(n);
+      const isKeyMember = (r, g) => {
+        if (g === "新生儿") return r.age >= 0 && r.age <= 1;
+        if (g === "中小学生") return r.age >= 6 && r.age <= 18 && !!r.isPrimarySecondary;
+        if (g === "高校生") return r.age >= 16 && r.age <= 30 && !!r.isCollege;
+        if (g === "资助对象") return !!r.isHardship;
+        return false;
+      };
       const filters = {
         target_all: x => x.type === "居民",
         target_staff: x => x.type === "企业",
@@ -2375,10 +2441,16 @@
         flow_pause: x => x.type === "居民" && x.pauseFlow === "申请停保",
         flow_transfer: x => x.type === "居民" && x.pauseFlow === "跨区转出"
       };
+      if (mode && mode.startsWith("age_gender|")) {
+        const parts = mode.split("|");
+        const ageGroup = parts[1];
+        const gender = parts[2];
+        return residents.filter(r => r.ageGroup === ageGroup && r.gender === gender);
+      }
       if (mode && mode.startsWith("age_")) return residents.filter(r => r.ageGroup === mode.replace("age_", ""));
-      if (mode && mode.startsWith("key_insured_")) { const g = mode.replace("key_insured_", ""); return residents.filter(r => r.keyGroup === g && r.thisYearPaid); }
-      if (mode && mode.startsWith("key_uninsured_")) { const g = mode.replace("key_uninsured_", ""); return residents.filter(r => r.keyGroup === g && !r.thisYearPaid); }
-      if (mode && mode.startsWith("key_")) return residents.filter(r => r.keyGroup === mode.replace("key_", ""));
+      if (mode && mode.startsWith("key_insured_")) { const g = mode.replace("key_insured_", ""); return residents.filter(r => isKeyMember(r, g) && r.thisYearPaid); }
+      if (mode && mode.startsWith("key_uninsured_")) { const g = mode.replace("key_uninsured_", ""); return residents.filter(r => isKeyMember(r, g) && !r.thisYearPaid); }
+      if (mode && mode.startsWith("key_")) return residents.filter(r => isKeyMember(r, mode.replace("key_", "")));
       if (mode && mode.startsWith("loss_")) return residents.filter(r => r.lossReason === mode.replace("loss_", ""));
       if (filters[mode]) return all.filter(filters[mode]);
       return all;
@@ -2450,10 +2522,14 @@
         };
         titleMap[mode] = `${unitName} · ${metricLabel[baseMode] || "对象名单"}`;
       }
-      if (mode && mode.startsWith("age_")) titleMap[mode] = `年龄组：${mode.replace("age_", "")}`;
+      if (mode && mode.startsWith("age_gender|")) {
+        const parts = mode.split("|");
+        titleMap[mode] = `年龄组：${parts[1]}（${parts[2]}）`;
+      }
+      if (mode && mode.startsWith("age_") && !mode.startsWith("age_gender|")) titleMap[mode] = `年龄组：${mode.replace("age_", "")}`;
       if (mode && mode.startsWith("key_insured_")) titleMap[mode] = `${mode.replace("key_insured_", "")}：已参保名单`;
       if (mode && mode.startsWith("key_uninsured_")) titleMap[mode] = `${mode.replace("key_uninsured_", "")}：未参保名单`;
-      if (mode && mode.startsWith("key_")) titleMap[mode] = `重点对象：${mode.replace("key_", "")}`;
+      if (mode && mode.startsWith("key_") && !mode.startsWith("key_insured_") && !mode.startsWith("key_uninsured_")) titleMap[mode] = `重点对象：${mode.replace("key_", "")}`;
       if (mode && mode.startsWith("loss_")) titleMap[mode] = `减员原因：${mode.replace("loss_", "")}`;
       els.drawerTitle.textContent = titleMap[mode] || "明细名单";
       els.drawerType.innerHTML = `<option value="all">全部</option><option value="居民">居民</option><option value="企业">企业</option>`;
@@ -2462,6 +2538,11 @@
       const defaults = inferDefaultFilters(mode);
       els.drawerType.value = defaults.type || (typeSet.size === 1 ? [...typeSet][0] : "all");
       state.selectedTags = defaults.tags || [];
+      // 年龄下钻强制兜底：锁定居民并清空标签，避免历史状态导致0条
+      if (mode && (mode.startsWith("age_") || mode.startsWith("age_gender|"))) {
+        els.drawerType.value = "居民";
+        state.selectedTags = [];
+      }
       els.searchName.value = "";
       els.searchSecond.value = "";
       els.searchAddress.value = "";
@@ -2481,7 +2562,7 @@
     function inferDefaultFilters(mode) {
       const out = { type: "all", tags: [] };
       if (mode.startsWith("risk_") || mode.startsWith("staff_unit_")) out.type = "企业";
-      if (mode.startsWith("flow_") || mode.startsWith("age_") || mode.startsWith("key_") || mode.startsWith("hh_") || mode.startsWith("loss_") || mode.startsWith("worker_") || mode.startsWith("stock_") || mode.startsWith("inc_")) out.type = "居民";
+      if (mode.startsWith("flow_") || mode.startsWith("age_") || mode.startsWith("age_gender|") || mode.startsWith("key_") || mode.startsWith("hh_") || mode.startsWith("loss_") || mode.startsWith("worker_") || mode.startsWith("stock_") || mode.startsWith("inc_")) out.type = "居民";
       const map = {
         risk_high: ["高"],
         risk_medium: ["中"],
@@ -2494,11 +2575,14 @@
         worker_increment_potential: ["未参保"],
         worker_done_resident: ["居民保"]
       };
-      if (mode.startsWith("age_")) out.tags = [mode.replace("age_", "")];
+      // 年龄段下钻已由 getDrawerItems(age_xxx)完成过滤；固定条件筛选不含年龄标签，避免二次过滤成空
+      if (mode.startsWith("age_")) out.tags = [];
+      if (mode.startsWith("age_gender|")) out.tags = [];
       if (mode.startsWith("loss_")) out.tags = [mode.replace("loss_", "")];
-      if (mode.startsWith("key_insured_")) out.tags = [mode.replace("key_insured_", ""), "居民保"];
-      if (mode.startsWith("key_uninsured_")) out.tags = [mode.replace("key_uninsured_", ""), "未参保"];
-      if (mode.startsWith("key_") && !mode.startsWith("key_insured_") && !mode.startsWith("key_uninsured_")) out.tags = [mode.replace("key_", "")];
+      // 重点对象下钻由 getDrawerItems(key_xxx)完成过滤，避免再叠加标签导致口径偏差
+      if (mode.startsWith("key_insured_")) out.tags = [];
+      if (mode.startsWith("key_uninsured_")) out.tags = [];
+      if (mode.startsWith("key_") && !mode.startsWith("key_insured_") && !mode.startsWith("key_uninsured_")) out.tags = [];
       if (map[mode]) out.tags = [...map[mode]];
       return out;
     }
@@ -2598,6 +2682,7 @@
         return [
           { text: "居民", level: "ok", group: "对象类型标签" },
           { text: levelText, level: "", group: "层级" },
+          { text: x.gender, level: "", group: "人员性别" },
           { text: x.household, level: "", group: "居民户籍" },
           { text: x.residence, level: "", group: "居民居住" },
           { text: x.residenceDetail || x.residence, level: "", group: "居民居住细分" },
