@@ -154,6 +154,30 @@
       color: #6b7b93;
       padding: 10px 0 4px;
     }
+
+    @media (max-width: 520px) {
+      body {
+        background: var(--bg-app);
+        padding: 0;
+      }
+      .app {
+        width: 100vw;
+        min-height: 100dvh;
+        border-radius: 0;
+        padding: 0;
+        box-shadow: none;
+      }
+      .main {
+        border-radius: 0;
+        min-height: 100dvh;
+        border-left: 0;
+        border-right: 0;
+      }
+      .entry {
+        width: calc(100vw - 48px);
+        max-width: none;
+      }
+    }
   </style>
 </head>
 <body>
