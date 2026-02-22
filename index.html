@@ -1420,7 +1420,27 @@
       }
     };
 
-    const API_BASE = (JSON.parse(localStorage.getItem("dashboard_session") || "{}").apiBase) || localStorage.getItem("dashboard_api_base") || "http://127.0.0.1:8787";
+    function normalizeApiBase(v) {
+      return (v || "").trim().replace(/\/+$/, "");
+    }
+    function resolveApiBase() {
+      const q = new URLSearchParams(location.search);
+      const fromQuery = normalizeApiBase(q.get("apiBase") || "");
+      if (fromQuery) {
+        localStorage.setItem("dashboard_api_base", fromQuery);
+        return fromQuery;
+      }
+      const session = JSON.parse(localStorage.getItem("dashboard_session") || "{}");
+      const fromSession = normalizeApiBase(session.apiBase || "");
+      if (fromSession) return fromSession;
+      const fromStorage = normalizeApiBase(localStorage.getItem("dashboard_api_base") || "");
+      if (fromStorage) return fromStorage;
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+        return `${location.protocol}//${location.hostname}:8787`;
+      }
+      return "http://127.0.0.1:8787";
+    }
+    const API_BASE = resolveApiBase();
     let apiToken = (JSON.parse(localStorage.getItem("dashboard_session") || "{}").token) || "";
 
     function mergeProfileToIdentity(identity, profile) {

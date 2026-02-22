@@ -84,6 +84,38 @@
       text-align: center;
       transform: translateY(56px);
     }
+    .api-bar {
+      margin: 0 auto 8px;
+      transform: translateY(52px);
+      width: min(420px, calc(100vw - 56px));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border: 1px solid #dbe2ec;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 6px 8px;
+    }
+    .api-text {
+      min-width: 0;
+      font-size: 11px;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .api-btn {
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
     .grid {
       width: 100%;
       display: flex;
@@ -192,6 +224,10 @@
         重庆市九龙坡区
       </div>
       <div class="sub">请选择登录角色后进入看板</div>
+      <div class="api-bar">
+        <div id="apiText" class="api-text"></div>
+        <button id="apiSetBtn" class="api-btn" type="button">设置</button>
+      </div>
       <div class="grid">
         <button class="entry district" data-id="district_leader">
           <div class="left">
@@ -246,12 +282,44 @@
     </div>
   </div>
   <script>
-    const API_BASE = localStorage.getItem("dashboard_api_base") || "http://127.0.0.1:8787";
+    function normalizeApiBase(v) {
+      return (v || "").trim().replace(/\/+$/, "");
+    }
+    function resolveApiBase() {
+      const q = new URLSearchParams(location.search);
+      const fromQuery = normalizeApiBase(q.get("apiBase") || "");
+      if (fromQuery) {
+        localStorage.setItem("dashboard_api_base", fromQuery);
+        return fromQuery;
+      }
+      const fromStorage = normalizeApiBase(localStorage.getItem("dashboard_api_base") || "");
+      if (fromStorage) return fromStorage;
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+        return `${location.protocol}//${location.hostname}:8787`;
+      }
+      return "http://127.0.0.1:8787";
+    }
+    let API_BASE = resolveApiBase();
     const LOGIN_MAP = {
       district_leader: { username: "district", password: "123456" },
       street_leader: { username: "street", password: "123456" },
       village_leader: { username: "village", password: "123456" },
       grid_worker: { username: "grid", password: "123456" }
+    };
+    const apiTextEl = document.getElementById("apiText");
+    function renderApiText() {
+      apiTextEl.textContent = `后端地址：${API_BASE}`;
+    }
+    renderApiText();
+    document.getElementById("apiSetBtn").onclick = () => {
+      const next = window.prompt("请输入后端地址（示例：https://your-api.example.com）", API_BASE || "");
+      if (next == null) return;
+      const val = normalizeApiBase(next);
+      if (!val) return;
+      API_BASE = val;
+      localStorage.setItem("dashboard_api_base", API_BASE);
+      renderApiText();
+      alert(`后端地址已设置为：${API_BASE}`);
     };
 
     async function doLogin(identity) {
@@ -284,7 +352,7 @@
         try {
           await doLogin(el.dataset.id);
         } catch (e) {
-          alert(`登录失败：${e.message}\n请先启动后端：${API_BASE}`);
+          alert(`登录失败：${e.message}\n当前后端地址：${API_BASE}`);
           el.querySelector(".go").textContent = old;
           el.disabled = false;
         }
