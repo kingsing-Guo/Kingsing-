@@ -32,7 +32,7 @@
       min-height: 100dvh;
       background: var(--bg-app);
       border-radius: 28px;
-      padding: 14px 14px 96px;
+      padding: 14px 14px 20px;
       box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 20px 50px rgba(0,0,0,.35);
       position: relative;
     }
@@ -993,11 +993,6 @@
     .side-metric .row .num-value { font-size:17px; color:var(--text); font-weight:800; }
     .side-label { font-size:11px; color:var(--muted); font-weight:600; margin-right:2px; }
 
-    .bottom-nav { position: fixed; left:50%; transform:translateX(-50%); bottom:0; width:min(480px, calc(100vw - 20px)); background:rgba(248,250,252,.98); border-top:1px solid var(--line); border-radius:16px 16px 0 0; display:grid; grid-template-columns:repeat(4,1fr); padding:8px 10px 10px; z-index:8; }
-    .nav-item { text-align:center; color:#94a3b8; font-size:11px; }
-    .nav-item i { display:block; width:20px; height:20px; border-radius:6px; margin:0 auto 4px; background:#e2e8f0; }
-    .nav-item.active { color:#2563eb; font-weight:700; }
-    .nav-item.active i { background:#bfdbfe; }
 
     @media (max-width: 380px) {
       .hero-grid { grid-template-columns: 1fr; justify-items: center; }
@@ -1014,7 +1009,7 @@
         width: 100vw;
         min-height: 100dvh;
         border-radius: 0;
-        padding: 0 4px 92px;
+        padding: 0 4px 20px;
         box-shadow: none;
       }
       .user-sub-row {
@@ -1073,7 +1068,7 @@
         grid-template-columns: 1fr;
       }
       .staff-grid.two {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0,1fr));
       }
       .staff-pie-item {
         display: grid;
@@ -1087,7 +1082,7 @@
         white-space: nowrap;
       }
       .sketch-body {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1.2fr;
       }
       .sketch-main .main-value {
         font-size: clamp(24px, 8vw, 32px);
@@ -1122,12 +1117,6 @@
       }
       .done-value-row .add-num {
         align-self: flex-end;
-      }
-      .bottom-nav {
-        width: 100vw;
-        border-radius: 0;
-        left: 0;
-        transform: none;
       }
       .drawer {
         width: 100vw;
@@ -1197,13 +1186,6 @@
       <div class="section"><h3 data-icon="todo">待动员名单</h3><div class="panel" id="workerTodo"></div></div>
       <div class="section"><h3 data-icon="company">企业风险走访清单</h3><div class="panel" id="workerRisk"></div></div>
     </div>
-  </div>
-
-  <div class="bottom-nav">
-    <div class="nav-item active"><i></i>看板</div>
-    <div class="nav-item"><i></i>分析</div>
-    <div class="nav-item"><i></i>任务</div>
-    <div class="nav-item"><i></i>我的</div>
   </div>
 
   <div class="overlay" id="overlay"></div>
@@ -1294,6 +1276,7 @@
 
     function mkVillage(name, target, current) {
       const uninsured = Math.max(target - current, 0);
+      const villageSalt = Array.from(name).reduce((s, ch) => s + ch.charCodeAt(0), 0);
       const residentPool = ["李明", "张华", "王芳", "赵刚", "周婷", "陈俊", "杨雪", "吴鹏", "刘洋", "黄敏", "何磊", "宋佳", "邓洁", "潘凯", "周文", "何杰"];
       const companyPool = ["宏达科技", "九龙物流", "渝新制造", "兴业商贸", "巴渝建工", "成信餐饮", "腾跃电子", "弘博服务", "云创医疗", "华腾教育"];
       const industries = ["制造", "物流", "建筑", "餐饮", "服务", "电子", "医疗", "教育"];
@@ -1304,6 +1287,8 @@
 
       let underageStaffCorrected = 0;
       const residents = Array.from({ length: Math.max(Math.floor(uninsured * 0.7), 24) }, (_, i) => {
+        const serial = (villageSalt % 89) * 1000 + (i + 1);
+        const addrSeed = i + villageSalt;
         const age = (i * 4) % 76;
         const gender = i % 2 === 0 ? "男" : "女";
         const household = i % 3 === 0 ? "本区户籍" : "非本区户籍";
@@ -1354,18 +1339,20 @@
         }
         const pauseFlow = !thisYearPaid ? (i % 3 === 0 ? "转居民保" : (i % 3 === 1 ? "申请停保" : "跨区转出")) : "";
         const ageGroup = age <= 16 ? "16岁及以下" : age <= 30 ? "16-30岁" : age <= 45 ? "31-45岁" : age <= 60 ? "46-60岁" : "60岁以上";
-        const phone = `13${(500000000 + i * 97).toString().slice(0, 9)}`;
-        const hukouAddress = `重庆市九龙坡区${hukouStreet[i % hukouStreet.length]}${(i % 120) + 1}号`;
+        const phoneMid = ((500000000 + addrSeed * 97) % 1000000000).toString().padStart(9, "0");
+        const phone = `13${phoneMid}`;
+        const hukouAddress = `重庆市九龙坡区${hukouStreet[addrSeed % hukouStreet.length]}${(addrSeed % 120) + 1}号`;
         const livingAddress = residenceDetail === "本辖区"
-          ? `重庆市九龙坡区${name}${liveStreet[i % liveStreet.length]}${(i % 60) + 1}号`
+          ? `重庆市九龙坡区${name}${liveStreet[addrSeed % liveStreet.length]}${(addrSeed % 60) + 1}号`
           : (residenceDetail === "区内其他辖区"
-            ? `重庆市九龙坡区其他辖区${(i % 90) + 1}号`
+            ? `重庆市九龙坡区其他辖区${(addrSeed % 90) + 1}号`
             : (residenceDetail === "市内外区"
-              ? `重庆市主城其他区${(i % 130) + 1}号`
-              : `重庆市外地区${(i % 220) + 1}号`));
+              ? `重庆市主城其他区${(addrSeed % 130) + 1}号`
+              : `重庆市外地区${(addrSeed % 220) + 1}号`));
         return {
+          id: `R-${name}-${serial}`,
           type: "居民",
-          name: residentPool[i % residentPool.length] + (i + 1),
+          name: residentPool[i % residentPool.length] + serial,
           reason: stockChangeType === "可动员" ? "存量未参保（可动员）" : (stockChangeType || (!thisYearPaid ? "未参保" : "已参保")),
           age, ageGroup, gender, household, residence, residenceDetail, insuredPlace,
           phone, hukouAddress, livingAddress,
@@ -1382,18 +1369,21 @@
       }
 
       const enterprises = Array.from({ length: Math.max(Math.floor(uninsured * 0.3), 8) }, (_, i) => {
+        const serial = (villageSalt % 97) * 1000 + (i + 1);
+        const addrSeed = i + villageSalt;
         const risk = i % 3 === 0 ? "高" : (i % 3 === 1 ? "中" : "低");
         const rand1 = seededRand((target + i + 11) * 13);
         const rand2 = seededRand((current + i + 19) * 29);
         const staffInsured = rand1 < STAFF_CONFIG.unitInsuredRate;
         const lastMonthStaffInsured = rand2 < STAFF_CONFIG.unitInsuredRateLastMonth;
         return {
+          id: `E-${name}-${serial}`,
           type: "企业",
-          name: companyPool[i % companyPool.length] + (i + 1),
+          name: companyPool[i % companyPool.length] + serial,
           legalPerson: ["李强", "王磊", "张敏", "赵军", "陈涛"][i % 5],
           contactPerson: ["刘经理", "周主管", "黄主任", "何女士", "杨先生"][i % 5],
-          phone: `18${(300000000 + i * 61).toString().slice(0, 9)}`,
-          regAddress: `重庆市九龙坡区${name}${(i % 80) + 1}号`,
+          phone: `18${((300000000 + addrSeed * 61) % 1000000000).toString().padStart(9, "0")}`,
+          regAddress: `重庆市九龙坡区${name}${(addrSeed % 80) + 1}号`,
           reason: i % 2 === 0 ? "欠费超3个月" : "缴费基数做实率偏低",
           duration: 2 + (i % 10),
           gapRate: 8 + (i % 15),
@@ -1556,34 +1546,21 @@
       return `<span class="num-wrap"><span class="num-value">${n.toLocaleString()}</span><span class="num-unit">${unit}</span></span>`;
     }
     function computeCoreMetrics(node) {
-      const done = node.current;
+      const paidResidents = node.residents.filter(r => r.thisYearPaid);
+      const staffDone = paidResidents.filter(r => r.thisYearType === "职工保").length;
+      const residentDone = paidResidents.filter(r => r.thisYearType !== "职工保").length;
+      const done = staffDone + residentDone;
       const target = node.target;
       const pct = ratio(done, target);
       const staffTarget = Math.round(target * 0.42);
       const residentTarget = Math.max(target - staffTarget, 0);
-      let staffDone = Math.min(staffTarget, Math.round(staffTarget * (Number(pct) / 100)));
-      let residentDone = done - staffDone;
-      if (residentDone > residentTarget) {
-        residentDone = residentTarget;
-        staffDone = done - residentDone;
-      }
-      if (staffDone > staffTarget) {
-        staffDone = staffTarget;
-        residentDone = done - staffDone;
-      }
-      if (residentDone < 0) {
-        residentDone = 0;
-        staffDone = done;
-      }
-      const gapStaff = staffTarget - staffDone;
-      const gapResident = residentTarget - residentDone;
-      const gapTotal = gapStaff + gapResident;
+      const gapStaff = Math.max(staffTarget - staffDone, 0);
+      const gapResident = Math.max(residentTarget - residentDone, 0);
+      const gapTotal = Math.max(target - done, 0);
       return { done, target, pct, staffTarget, residentTarget, staffDone, residentDone, gapStaff, gapResident, gapTotal };
     }
     function residentDoneListByMetric(node) {
-      const m = computeCoreMetrics(node);
-      const pool = node.residents.filter(r => r.thisYearPaid).slice().sort((a, b) => (a.duration || 0) - (b.duration || 0));
-      return pool.slice(0, Math.max(m.residentDone, 0));
+      return node.residents.filter(r => r.thisYearType === "居民保" && r.thisYearPaid);
     }
 
     function renderSelectors() {
@@ -1804,17 +1781,13 @@
 
       const metricOf = (n) => {
         const totalTarget = n.target;
-        const totalDone = n.current;
-        const totalRate = Number(ratio(totalDone, Math.max(totalTarget, 1)));
+        const paidResidents = n.residents.filter(r => r.thisYearPaid);
+        const totalDone = paidResidents.length;
         const staffTarget = Math.round(totalTarget * 0.42);
         const residentTarget = Math.max(totalTarget - staffTarget, 0);
-        let staffDone = Math.min(staffTarget, Math.round(staffTarget * (totalRate / 100)));
-        let residentDone = totalDone - staffDone;
-        if (residentDone > residentTarget) {
-          residentDone = residentTarget;
-          staffDone = totalDone - residentDone;
-        }
-        if (residentDone < 0) residentDone = 0;
+        const staffDone = paidResidents.filter(r => r.thisYearType === "职工保").length;
+        const residentDone = paidResidents.filter(r => r.thisYearType === "居民保").length;
+        const totalRate = Number(ratio(totalDone, Math.max(totalTarget, 1)));
         const staffRate = Number(ratio(staffDone, Math.max(staffTarget, 1)));
         const residentRate = Number(ratio(residentDone, Math.max(residentTarget, 1)));
         return { name: n.name, totalTarget, totalDone, totalRate, staffTarget, staffDone, staffRate, residentTarget, residentDone, residentRate };
@@ -2099,26 +2072,6 @@
     }
 
     function renderStaff(node) {
-      const target = node.target;
-      const done = node.current;
-      const pct = ratio(done, target);
-      const staffTarget = Math.round(target * 0.42);
-      let staffDone = Math.min(staffTarget, Math.round(staffTarget * (Number(pct) / 100)));
-      let residentDone = done - staffDone;
-      const residentTarget = Math.max(target - staffTarget, 0);
-      if (residentDone > residentTarget) {
-        residentDone = residentTarget;
-        staffDone = done - residentDone;
-      }
-      if (staffDone > staffTarget) {
-        staffDone = staffTarget;
-        residentDone = done - staffDone;
-      }
-      if (residentDone < 0) {
-        residentDone = 0;
-        staffDone = done;
-      }
-
       const detailDefs = [
         { key: "在职职工", big: "单位参保", mode: "staff_detail_onjob" },
         { key: "单位退休人员", big: "单位参保", mode: "staff_detail_org_retired" },
@@ -2127,31 +2080,18 @@
         { key: "个人退休（一档）", big: "个人参保（灵活就业）", mode: "staff_detail_person_retired_1" },
         { key: "个人退休（二档）", big: "个人参保（灵活就业）", mode: "staff_detail_person_retired_2" }
       ];
-      const totalStaffPeople = staffDone;
-      const weights = detailDefs.map(d => {
-        if (d.key === "在职职工") return STAFF_CONFIG.detailRatio.onjob || 0;
-        if (d.key === "单位退休人员") return STAFF_CONFIG.detailRatio.orgRetired || 0;
-        if (d.key === "灵活就业（一档）") return STAFF_CONFIG.detailRatio.flex1 || 0;
-        if (d.key === "灵活就业（二档）") return STAFF_CONFIG.detailRatio.flex2 || 0;
-        if (d.key === "个人退休（一档）") return STAFF_CONFIG.detailRatio.personRetired1 || 0;
-        if (d.key === "个人退休（二档）") return STAFF_CONFIG.detailRatio.personRetired2 || 0;
-        return 0;
-      });
-      const wSum = weights.reduce((s, w) => s + w, 0) || 1;
-      const baseCounts = weights.map(w => Math.floor(totalStaffPeople * (w / wSum)));
-      let remain = Math.max(totalStaffPeople - baseCounts.reduce((s, c) => s + c, 0), 0);
-      let idx = 0;
-      while (remain > 0) {
-        baseCounts[idx % baseCounts.length] += 1;
-        idx += 1;
-        remain -= 1;
-      }
-      const detailStats = detailDefs.map((d, i) => ({ ...d, count: baseCounts[i] || 0 }));
+      // 统一口径：全部基于“明细数据”实时聚合，确保卡片数值与穿透条数一致
+      const staffResidents = node.residents.filter(r => r.thisYearType === "职工保");
+      const totalStaffPeople = staffResidents.length;
+      const detailStats = detailDefs.map(d => ({
+        ...d,
+        count: staffResidents.filter(r => r.staffDetailType === d.key).length
+      }));
       const onJobCount = detailStats.find(d => d.key === "在职职工")?.count || 0;
       const orgRetiredCount = detailStats.find(d => d.key === "单位退休人员")?.count || 0;
       const byBig = {
-        unit: onJobCount + orgRetiredCount,
-        personal: Math.max(totalStaffPeople - onJobCount - orgRetiredCount, 0)
+        unit: staffResidents.filter(r => r.staffBigType === "单位参保").length,
+        personal: staffResidents.filter(r => r.staffBigType === "个人参保（灵活就业）").length
       };
 
       const unitsTotal = node.enterprises.length;
@@ -2334,8 +2274,8 @@
           target_staff: x => x.type === "企业",
           target_resident: x => x.type === "居民",
           done_all: x => x.type === "居民" && x.thisYearPaid,
-          staff_done: x => x.type === "企业",
-          resident_done: x => x.type === "居民" && x.thisYearPaid
+          staff_done: x => x.type === "居民" && x.thisYearType === "职工保" && x.thisYearPaid,
+          resident_done: x => x.type === "居民" && x.thisYearType === "居民保" && x.thisYearPaid
         };
         return localFilters[baseMode] ? all.filter(localFilters[baseMode]) : all;
       }
@@ -2356,8 +2296,8 @@
         target_staff: x => x.type === "企业",
         target_resident: x => x.type === "居民",
         done_all: x => x.type === "居民" && x.thisYearPaid,
-        staff_done: x => x.type === "企业",
-        resident_done: x => x.type === "居民" && x.thisYearPaid,
+        staff_done: x => x.type === "居民" && x.thisYearType === "职工保" && x.thisYearPaid,
+        resident_done: x => x.type === "居民" && x.thisYearType === "居民保" && x.thisYearPaid,
         staff_people_all: x => x.type === "居民" && x.thisYearType === "职工保",
         staff_big_unit: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffBigType === "单位参保",
         staff_big_personal: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffBigType === "个人参保（灵活就业）",
@@ -2370,7 +2310,7 @@
         staff_unit_total: x => x.type === "企业",
         staff_unit_insured: x => x.type === "企业" && x.staffInsured,
         staff_unit_uninsured: x => x.type === "企业" && !x.staffInsured,
-        worker_done_resident: x => x.type === "居民" && x.thisYearPaid,
+        worker_done_resident: x => x.type === "居民" && x.thisYearType === "居民保" && x.thisYearPaid,
         worker_stock_unpaid: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "可动员",
         worker_increment_potential: x => x.type === "居民" && !x.thisYearPaid && ((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && (x.household === "本区户籍" || x.residence === "本区居住"),
         worker_mobilizable: x => x.type === "居民" && (
@@ -2636,6 +2576,13 @@
 
     function renderDrawerList() {
       let items = getDrawerItems(state.drawer);
+      const seen = new Set();
+      items = items.filter(i => {
+        const k = i.id || `${i.type}|${i.name}|${i.phone || ""}|${i.hukouAddress || i.regAddress || ""}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
       const t = els.drawerType.value || "all";
       if (t !== "all") items = items.filter(i => i.type === t);
       if (state.selectedTags.length) {
