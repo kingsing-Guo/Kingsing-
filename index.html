@@ -360,6 +360,10 @@
       text-align: center;
       line-height: 1.35;
     }
+    .gauge-trend .trend-item {
+      display: block;
+      white-space: nowrap;
+    }
     .sketch-block {
       position: relative;
       border: 1px solid #dbe7ff;
@@ -726,6 +730,27 @@
     .key-stat.insured { color:#047857; border-color:#86efac; background:linear-gradient(180deg,#f0fdf4 0%,#ecfdf5 100%); }
     .key-stat.uninsured { color:#b45309; border-color:#fcd34d; background:linear-gradient(180deg,#fffbeb 0%,#fef3c7 100%); }
     .key-total { font-size:11px; color:var(--muted); font-weight:700; margin-right:2px; }
+    .done-value-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .done-value-row .main-num {
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .done-value-row .add-num {
+      margin: 0;
+      white-space: nowrap;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .done-value-row .add-num .pct-highlight {
+      font-size: 14px;
+    }
 
     .risk-card { border:1px solid #fde68a; background:#fffbeb; border-radius:14px; padding:8px; margin-top:8px; cursor:pointer; }
     .risk-card.high { border-color:#fecaca; background:#fef2f2; }
@@ -865,9 +890,14 @@
     .drawer.show { transform: translateY(0); }
     .drawer-head { display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:#f8fafc; padding:2px 0 6px; z-index:1; }
     .drawer-head-right { display:flex; align-items:center; gap:6px; }
-    .phone-toggle { font-size:11px; color:#475569; user-select:none; }
+    .phone-toggle { font-size:11px; color:#475569; user-select:none; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
     .btn-mini { border:0; border-radius:8px; padding:4px 8px; font-size:11px; cursor:pointer; background:#e0f2fe; color:#0369a1; }
-    .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+    .filters {
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:8px;
+      margin-bottom:8px;
+    }
     .filters input {
       border: 1px solid #dbe2ec;
       border-radius: 10px;
@@ -875,8 +905,8 @@
       color: #334155;
       padding: 8px;
       font-size: 12px;
-      width: calc(33.333% - 6px);
-      min-width: 140px;
+      width: 100%;
+      min-width: 0;
     }
     .drawer-tools {
       display:flex;
@@ -891,7 +921,8 @@
       font-size:12px;
       color:#64748b;
       font-weight:700;
-      white-space:nowrap;
+      white-space:normal;
+      line-height:1.3;
     }
     .drawer-tool-right {
       margin-left:auto;
@@ -978,9 +1009,57 @@
         padding: 0 4px 92px;
         box-shadow: none;
       }
+      .user-sub-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+      .year-inline {
+        justify-content: flex-end;
+      }
+      .filters {
+        grid-template-columns: 1fr;
+      }
+      .drawer-tools {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 6px;
+        align-items: start;
+      }
+      .drawer-result {
+        font-size: 11px;
+      }
+      .drawer-tool-right {
+        width: 100%;
+        justify-content: flex-end;
+        margin-left: 0;
+      }
+      .list-item {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .side-metric {
+        width: 100%;
+        flex-direction: row;
+        justify-content: flex-end;
+        gap: 12px;
+        border-top: 1px dashed #e2e8f0;
+        padding-top: 6px;
+        min-width: 0;
+      }
+      #keyPanel .metric-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        align-items: start;
+        gap: 8px;
+      }
+      #keyPanel .metric-row > div:last-child {
+        justify-self: end;
+      }
       .key-stat .t2 {
         white-space: nowrap;
-        font-size: 11px;
+        font-size: 10px;
+        letter-spacing: -0.1px;
       }
       .staff-pies {
         grid-template-columns: 1fr;
@@ -995,6 +1074,20 @@
       }
       .staff-pie-item .v {
         white-space: nowrap;
+      }
+      .gauge-trend {
+        font-size: 9px;
+      }
+      .gauge-trend .trend-item {
+        line-height: 1.25;
+      }
+      .done-value-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      .done-value-row .add-num {
+        align-self: flex-end;
       }
       .bottom-nav {
         width: 100vw;
@@ -1528,17 +1621,17 @@
             <div class="gauge-card clickable" data-drill="progress">
               <div class="gauge-label">总完成率</div>
               <div class="mini-ring" style="--p:${Math.min(Number(pct), 100)}"><b class="pct-highlight warn">${pct}%</b></div>
-              <div class="gauge-trend">同比 <span class="pct-highlight warn">+${totalYoy}%</span> · 环比 <span class="pct-highlight warn">+${totalMom}%</span></div>
+              <div class="gauge-trend"><span class="trend-item">同比 <span class="pct-highlight warn">+${totalYoy}%</span></span><span class="trend-item">环比 <span class="pct-highlight warn">+${totalMom}%</span></span></div>
             </div>
             <div class="gauge-card clickable" data-drill="staff_done">
               <div class="gauge-label">职工保完成率</div>
               <div class="mini-ring" style="--p:${Math.min(Number(staffDoneRate), 100)}"><b class="pct-highlight ok">${staffDoneRate}%</b></div>
-              <div class="gauge-trend">同比 <span class="pct-highlight ok">+${staffYoy}%</span> · 环比 <span class="pct-highlight ok">+${staffMom}%</span></div>
+              <div class="gauge-trend"><span class="trend-item">同比 <span class="pct-highlight ok">+${staffYoy}%</span></span><span class="trend-item">环比 <span class="pct-highlight ok">+${staffMom}%</span></span></div>
             </div>
             <div class="gauge-card clickable" data-drill="resident_done">
               <div class="gauge-label">居民保完成率</div>
               <div class="mini-ring" style="--p:${Math.min(Number(residentDoneRate), 100)}"><b class="pct-highlight">${residentDoneRate}%</b></div>
-              <div class="gauge-trend">同比 <span class="pct-highlight">+${residentYoy}%</span> · 环比 <span class="pct-highlight">+${residentMom}%</span></div>
+              <div class="gauge-trend"><span class="trend-item">同比 <span class="pct-highlight">+${residentYoy}%</span></span><span class="trend-item">环比 <span class="pct-highlight">+${residentMom}%</span></span></div>
             </div>
           </div>
           <div class="sketch-stack">
@@ -2101,9 +2194,9 @@
         <div class="card"><div class="label">本村居目标（居民保）</div><div class="value">${unitText(residentTarget, "人")}</div></div>
         <div class="card clickable" data-drill="worker_done_resident">
           <div class="label">已参保（居民保）</div>
-          <div class="value" style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
-            <span>${unitText(residentDone, "人")}</span>
-            <span class="mini" style="margin:0;white-space:nowrap;">昨日新增 <span class="pct-highlight ok" style="font-size:13px;">${unitText(yesterdayAdded, "人")}</span></span>
+          <div class="value done-value-row">
+            <span class="main-num">${unitText(residentDone, "人")}</span>
+            <span class="add-num">昨日新增 <span class="pct-highlight ok">${unitText(yesterdayAdded, "人")}</span></span>
           </div>
         </div>
         <div class="card"><div class="label">目标差距（居民保）</div><div class="value">${unitText(diff, "人")}</div></div>
