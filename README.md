@@ -119,3 +119,78 @@ echo "纯前端演示版: http://192.168.110.83:8090/login.html"
 ```bash
 pkill -f "backend/server.py"; pkill -f "http.server 8080"; pkill -f "http.server 8090"
 ```
+
+## 需求变更模板（先 Demo 后 Main）
+
+适用目标：先在 `frontend-demo` 快速确认视觉/交互，再同步到 `main`，减少联通版反复改动风险。
+
+### A. 一条需求的标准流程
+
+1) 在纯前端版实现与确认  
+```bash
+cd "/Users/tonibao_1/Documents/New project"
+git switch frontend-demo
+```
+- 完成 UI/交互改动
+- 本地验证（手机 + PC）
+- 提交（建议单需求单提交）
+
+```bash
+git add <files>
+git commit -m "feat(demo): <需求简述>"
+git push origin frontend-demo
+```
+
+2) 将已确认改动同步到联通版  
+```bash
+git switch main
+git cherry-pick <demo提交SHA>
+```
+- 若冲突：以 `main` 的接口/权限/口径为准解决
+- 解决后继续：
+```bash
+git add <resolved files>
+git cherry-pick --continue
+git push origin main
+```
+
+3) 联通版回归验证  
+- 登录流程（四角色）
+- 年度切换、权限范围、关键穿透
+- 手机端布局与交互
+
+### B. 提交信息规范（建议）
+- Demo 分支：`feat(demo): ...` / `style(demo): ...`
+- Main 分支：`feat(main): ...` / `fix(main): ...`
+
+### C. 哪些需求先放 demo，哪些直接改 main
+
+先放 `frontend-demo`：
+- 版式、色彩、图标、文案、交互细节
+- 手机端适配、动效、信息层级
+
+直接改 `main`：
+- 后端接口、权限控制、数据口径、穿透规则
+- 与数据库/服务端强相关逻辑
+
+### D. 每次合并前检查清单
+- [ ] 功能与需求描述一致
+- [ ] 不影响另一分支现有功能
+- [ ] 提交粒度清晰（单需求单提交）
+- [ ] 手机与PC都已自测
+
+## 已配置 Skill（先 Demo 后 Main）
+
+已创建并可复用的工作流 Skill：
+- 名称：`demo-first-main-flow`
+- 目录：`/Users/tonibao_1/.codex/skills/demo-first-main-flow`
+- 说明文件：`/Users/tonibao_1/.codex/skills/demo-first-main-flow/SKILL.md`
+
+用途：
+- 先在 `frontend-demo` 做视觉与交互定稿
+- 通过 `cherry-pick` 把确认后的改动同步到 `main`
+- 降低联通版反复改动和误改风险
+
+触发方式：
+- 在需求中显式写：`$demo-first-main-flow`
+- 或直接描述“先在演示版修改，确认后同步 main”的流程
