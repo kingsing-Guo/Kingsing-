@@ -69,3 +69,53 @@ git cherry-pick <frontend-demo上的提交SHA>
 git push origin main
 git push origin frontend-demo
 ```
+
+## 手机同时访问两个系统（联通版 + 纯前端版）
+
+前提：手机和电脑在同一 Wi-Fi；电脑局域网 IP 示例 `192.168.110.83`。
+
+### 手动启动（3个终端）
+
+终端A（联通版后端）：
+```bash
+cd "/Users/tonibao_1/Documents/New project"
+git switch main
+python3 backend/seed_db.py
+python3 backend/server.py
+```
+
+终端B（联通版前端）：
+```bash
+cd "/Users/tonibao_1/Documents/New project"
+python3 -m http.server 8080
+```
+
+终端C（纯前端演示版）：
+```bash
+cd "/Users/tonibao_1/Documents/纯前端演示版本"
+python3 -m http.server 8090
+```
+
+手机访问地址：
+- 联通版：`http://192.168.110.83:8080/login.html`
+- 纯前端版：`http://192.168.110.83:8090/login.html`
+
+联通版登录页点击“设置”，后端地址填：
+- `http://192.168.110.83:8787`
+
+### 一键启动（联通版前后端 + 纯前端版）
+```bash
+cd "/Users/tonibao_1/Documents/New project" && \
+python3 backend/seed_db.py && \
+(python3 backend/server.py > /tmp/dashboard_backend.log 2>&1 &) && \
+(python3 -m http.server 8080 > /tmp/dashboard_frontend_main.log 2>&1 &) && \
+(cd "/Users/tonibao_1/Documents/纯前端演示版本" && python3 -m http.server 8090 > /tmp/dashboard_frontend_demo.log 2>&1 &) && \
+echo "联通版前端: http://192.168.110.83:8080/login.html" && \
+echo "联通版后端: http://192.168.110.83:8787/api/health" && \
+echo "纯前端演示版: http://192.168.110.83:8090/login.html"
+```
+
+### 一键停止
+```bash
+pkill -f "backend/server.py"; pkill -f "http.server 8080"; pkill -f "http.server 8090"
+```
