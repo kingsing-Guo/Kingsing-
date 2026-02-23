@@ -84,37 +84,84 @@
       text-align: center;
       transform: none;
     }
-    .api-bar {
+    .config-wrap {
       margin: 10px auto 0;
       width: 68%;
       max-width: 320px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      border: 1px solid #dbe2ec;
-      border-radius: 12px;
-      background: #f8fafc;
-      padding: 6px 8px;
+      text-align: center;
     }
-    .api-text {
-      min-width: 0;
+    .config-link {
+      border: 0;
+      background: transparent;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 2px 4px;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .api-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, .28);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      padding: 16px;
+    }
+    .api-modal.show { display: flex; }
+    .api-modal-card {
+      width: min(420px, calc(100vw - 32px));
+      border: 1px solid #dbe2ec;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 20px 40px rgba(15,23,42,.2);
+      padding: 12px;
+    }
+    .api-modal-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    .api-current {
       font-size: 11px;
       color: #64748b;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      margin-bottom: 8px;
+      word-break: break-all;
     }
-    .api-btn {
-      border: 1px solid #bfdbfe;
+    .api-input {
+      width: 100%;
+      border: 1px solid #dbe2ec;
+      border-radius: 10px;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 12px;
+      padding: 8px 10px;
+      outline: none;
+    }
+    .api-actions {
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .api-action {
+      border: 1px solid #dbe2ec;
+      border-radius: 8px;
+      background: #fff;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .api-action.primary {
+      border-color: #bfdbfe;
       background: #eff6ff;
       color: #1d4ed8;
-      border-radius: 8px;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 8px;
-      cursor: pointer;
-      flex: 0 0 auto;
     }
     .grid {
       width: 100%;
@@ -209,7 +256,7 @@
         width: calc(100vw - 48px);
         max-width: none;
       }
-      .api-bar {
+      .config-wrap {
         width: calc(100vw - 48px);
         max-width: none;
       }
@@ -278,11 +325,19 @@
           <div class="go">进入看板 ›</div>
         </button>
       </div>
-      <div class="api-bar">
-        <div id="apiText" class="api-text"></div>
-        <button id="apiSetBtn" class="api-btn" type="button">设置</button>
-      </div>
+      <div class="config-wrap"><button id="apiSetBtn" class="config-link" type="button">后端地址配置</button></div>
       <div class="footer">重庆市九龙坡区医疗保障中心</div>
+    </div>
+  </div>
+  <div id="apiModal" class="api-modal">
+    <div class="api-modal-card" role="dialog" aria-modal="true" aria-labelledby="apiModalTitle">
+      <div id="apiModalTitle" class="api-modal-title">后端地址配置</div>
+      <div id="apiCurrent" class="api-current"></div>
+      <input id="apiInput" class="api-input" placeholder="请输入后端地址（示例：https://your-api.example.com）" />
+      <div class="api-actions">
+        <button id="apiCancelBtn" type="button" class="api-action">取消</button>
+        <button id="apiSaveBtn" type="button" class="api-action primary">保存</button>
+      </div>
     </div>
   </div>
   <script>
@@ -310,20 +365,30 @@
       village_leader: { username: "village", password: "123456" },
       grid_worker: { username: "grid", password: "123456" }
     };
-    const apiTextEl = document.getElementById("apiText");
-    function renderApiText() {
-      apiTextEl.textContent = `后端地址：${API_BASE}`;
+    const apiModal = document.getElementById("apiModal");
+    const apiInput = document.getElementById("apiInput");
+    const apiCurrent = document.getElementById("apiCurrent");
+    function openApiModal() {
+      apiCurrent.textContent = `当前后端地址：${API_BASE}`;
+      apiInput.value = API_BASE;
+      apiModal.classList.add("show");
+      setTimeout(() => apiInput.focus(), 0);
     }
-    renderApiText();
-    document.getElementById("apiSetBtn").onclick = () => {
-      const next = window.prompt("请输入后端地址（示例：https://your-api.example.com）", API_BASE || "");
-      if (next == null) return;
-      const val = normalizeApiBase(next);
+    function closeApiModal() {
+      apiModal.classList.remove("show");
+    }
+    document.getElementById("apiSetBtn").onclick = openApiModal;
+    document.getElementById("apiCancelBtn").onclick = closeApiModal;
+    document.getElementById("apiSaveBtn").onclick = () => {
+      const val = normalizeApiBase(apiInput.value);
       if (!val) return;
       API_BASE = val;
       localStorage.setItem("dashboard_api_base", API_BASE);
-      renderApiText();
+      closeApiModal();
       alert(`后端地址已设置为：${API_BASE}`);
+    };
+    apiModal.onclick = (e) => {
+      if (e.target === apiModal) closeApiModal();
     };
 
     async function doLogin(identity) {
