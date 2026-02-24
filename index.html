@@ -14,6 +14,7 @@
       --warn: #b45309;
       --bg-shell: #17181c;
       --bg-app: #f3f5f8;
+      --app-frame-width: min(480px, calc(100vw - 20px));
     }
     * { box-sizing: border-box; }
     body {
@@ -28,7 +29,7 @@
     }
     html { scroll-behavior: smooth; }
     .app {
-      width: min(480px, 100vw - 20px);
+      width: var(--app-frame-width);
       min-height: 100dvh;
       background: var(--bg-app);
       border-radius: 28px;
@@ -877,29 +878,45 @@
     .role-panels { display: none; }
     .role-panels.active { display: block; }
 
-    .overlay { position:fixed; inset:0; background: rgba(15,23,42,.38); opacity:0; visibility:hidden; transition:.22s; z-index:10; }
-    .overlay.show { opacity:1; visibility:visible; }
+    body.page-lock { overflow: hidden; }
+    .overlay { display:none; }
+    .overlay.show { display:none; }
     .drawer {
       position: fixed;
-      left: 0; right: 0; bottom: 0;
-      max-width: min(480px, calc(100vw - 20px));
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      max-width: var(--app-frame-width);
       margin: 0 auto;
       background: #f8fafc;
-      border: 1px solid #e6ebf2;
-      border-radius: 18px 18px 0 0;
-      box-shadow: 0 -10px 34px rgba(15,23,42,.16);
-      transform: translateY(102%);
-      transition: transform .22s ease;
-      max-height: 78dvh;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      transform: translateX(120vw);
+      transition: transform .2s ease;
+      max-height: 100dvh;
       overflow: auto;
-      padding: 12px;
+      padding: calc(10px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
       z-index: 20;
     }
-    .drawer.show { transform: translateY(0); }
+    .drawer.show { transform: translateX(0); }
     .drawer-head { display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:#f8fafc; padding:2px 0 6px; z-index:1; }
     .drawer-head-right { display:flex; align-items:center; gap:6px; }
     .phone-toggle { font-size:11px; color:#475569; user-select:none; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
-    .btn-mini { border:0; border-radius:8px; padding:4px 8px; font-size:11px; cursor:pointer; background:#e0f2fe; color:#0369a1; }
+    .btn-mini {
+      border:0;
+      border-radius:8px;
+      padding:4px 8px;
+      font-size:11px;
+      cursor:pointer;
+      background:#e0f2fe;
+      color:#0369a1;
+      white-space: nowrap;
+      flex-shrink: 0;
+      line-height: 1.2;
+    }
     .filters {
       display:grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -988,10 +1005,278 @@
     .tag.warn { background:#fef3c7; color:#92400e; }
     .tag.danger { background:#fee2e2; color:#991b1b; }
     .tag.ok { background:#dcfce7; color:#166534; }
+    .tag.key-newborn { background:#fff4cc; color:#b45309; border:1px solid #fde68a; }
+    .tag.key-hardship { background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe; }
+    .key-label-newborn { color:#b45309; font-weight:600; }
+    .key-label-hardship { color:#6d28d9; font-weight:600; }
     .side-metric { text-align:right; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:4px; min-width:84px; }
     .side-metric .row { font-size:11px; color:var(--muted); }
     .side-metric .row .num-value { font-size:17px; color:var(--text); font-weight:800; }
     .side-label { font-size:11px; color:var(--muted); font-weight:600; margin-right:2px; }
+    .link-btn {
+      border: 0;
+      background: transparent;
+      color: #1d4ed8;
+      font-weight: 800;
+      font-size: inherit;
+      cursor: pointer;
+      padding: 0;
+      text-align: left;
+    }
+    .archive-open { text-decoration: underline; text-underline-offset: 2px; }
+    .archive-meta { margin-top: 3px; }
+    .archive-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgba(15,23,42,.18);
+      display: none;
+      align-items: stretch;
+      justify-content: center;
+    }
+    .archive-modal.show { display: flex; }
+    .archive-sheet {
+      width: min(100vw, var(--app-frame-width));
+      max-width: min(100vw, var(--app-frame-width));
+      max-height: 100dvh;
+      border-radius: 0;
+      background: #f8fafc;
+      border: 0;
+      box-shadow: 0 8px 24px rgba(15,23,42,.12);
+      padding: calc(10px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
+      overflow: auto;
+      transform: translateX(100%);
+      transition: transform .22s ease;
+      margin: 0 auto;
+      font-size: 14px;
+      color: #334155;
+    }
+    .archive-modal.show .archive-sheet { transform: translateX(0); }
+    .archive-head {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f8fafc;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e6ebf2;
+      display: block;
+      min-height: 44px;
+    }
+    .archive-head > div:first-child { min-width: 0; width: 100%; }
+    .archive-title { font-size: 22px; font-weight: 800; color: #0f172a; line-height: 1.2; padding-right: 72px; }
+    .archive-sub {
+      font-size: 14px;
+      color: #64748b;
+      margin-top: 3px;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      line-height: 1.3;
+      padding-right: 0;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    #archiveClose { position: absolute; top: 0; right: 0; white-space: nowrap; flex-shrink: 0; }
+    .archive-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .archive-grid {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 8px;
+    }
+    .archive-kpi {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #fff;
+      padding: 8px;
+    }
+    .archive-kpi .k { font-size: 11px; color: #64748b; }
+    .archive-kpi .v { font-size: 18px; font-weight: 800; margin-top: 4px; color: #0f172a; }
+    .archive-section {
+      margin-top: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #fff;
+      padding: 10px;
+    }
+    .archive-section .h { font-size: 14px; font-weight: 800; color: #334155; margin-bottom: 8px; }
+    .archive-h-icon { display:inline-flex; align-items:center; gap:8px; }
+    .archive-h-icon svg { width:18px; height:18px; stroke:#2563eb; fill:none; stroke-width:1.9; }
+    .archive-section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .archive-lines { display: grid; gap: 6px; }
+    .archive-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; color: #64748b; }
+    .archive-line b { color: #0f172a; font-size: 14px; font-weight: 700; }
+    .staff-member-list { display: grid; gap: 8px; }
+    .staff-member-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: #f8fafc;
+      padding: 8px;
+    }
+    .staff-member-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .staff-member-state {
+      font-size: 12px;
+      color: #0f172a;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .staff-member-state.warn { color: #b45309; }
+    .staff-member-state.danger { color: #dc2626; }
+    .staff-member-state.warn .num-unit,
+    .staff-member-state.warn .num-value { color: #b45309; }
+    .staff-member-state.danger .num-unit,
+    .staff-member-state.danger .num-value { color: #dc2626; }
+    .staff-member-meta { margin-top: 4px; font-size: 12px; color: #64748b; line-height: 1.35; }
+    .staff-filter-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .staff-filter-chip {
+      border: 1px solid #dbe2ec;
+      background: #f8fafc;
+      color: #475569;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .staff-filter-chip.active {
+      border-color: #93c5fd;
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+    .staff-abn-trigger {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      color: #dc2626;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .staff-normal-trigger {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      color: #0f172a;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .staff-abn-trigger .num-value,
+    .staff-abn-trigger .num-unit { color: #dc2626; }
+    .staff-normal-trigger .num-value,
+    .staff-normal-trigger .num-unit { color: #0f172a; }
+    .stat-time {
+      font-size: 11px;
+      color: #64748b;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .trend-wrap { margin-top: 2px; }
+    .trend-svg { width: 100%; height: 160px; display: block; }
+    .trend-grid { stroke: #e2e8f0; stroke-width: 1; }
+    .trend-area { fill: rgba(59,130,246,.12); }
+    .trend-line { fill: none; stroke: #2563eb; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .trend-dot { fill: #2563eb; transition: transform .22s ease; transform-origin: center; }
+    .trend-dot.current { fill: #16a34a; }
+    .trend-label { font-size: 10px; fill: #94a3b8; }
+    .trend-value { font-size: 10px; fill: #64748b; }
+    .trend-point-value { font-size: 9px; fill: #64748b; }
+    .trend-wrap:hover .trend-line { stroke-width: 2.8; filter: drop-shadow(0 1px 2px rgba(37,99,235,.3)); }
+    .trend-wrap:hover .trend-dot { transform: scale(1.15); }
+    .trend-wrap:hover .trend-area { fill: rgba(59,130,246,.18); }
+    .archive-tag-rows { display: grid; gap: 6px; margin-top: 8px; }
+    .archive-tag-row { display: flex; flex-wrap: wrap; gap: 4px; }
+    .danger-text { color: #dc2626; font-weight: 400; font-size: inherit; }
+    .person-insure-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 6px;
+      align-items: stretch;
+    }
+    .person-insure-card {
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      border-radius: 14px;
+      padding: 8px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+      min-height: 88px;
+      height: 88px;
+      display: grid;
+      align-content: space-between;
+      gap: 4px;
+    }
+    .person-insure-head {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .person-insure-head span { white-space: nowrap; font-size: 13px; letter-spacing: 0; }
+    .person-insure-value {
+      font-size: 14px;
+      color: #0f172a;
+      font-weight: 500;
+      line-height: 1.15;
+      white-space: normal;
+      word-break: break-all;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      text-overflow: clip;
+    }
+    .person-insure-alert { color: #dc2626; font-weight: 500; }
+    .person-insure-sub { font-size: 11px; color: #64748b; line-height: 1.25; }
+    .basic-info-panel {
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .basic-info-list { display: grid; gap: 14px; margin-top: 8px; }
+    .basic-info-item { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; align-items: start; }
+    .basic-info-item svg { width: 16px; height: 16px; stroke: #94a3b8; fill: none; stroke-width: 1.9; margin-top: 4px; }
+    .basic-info-item .k { font-size: 13px; color: #94a3b8; font-weight: 700; margin-bottom: 3px; text-align: left; }
+    .basic-info-item .v { font-size: 14px; color: #0f172a; font-weight: 400; line-height: 1.4; text-align: left; }
+    .basic-info-item .v .link-btn { font-size: 14px; font-weight: 400; color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
+    .archive-phone-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; }
+    .archive-phone-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #64748b; }
+    .archive-phone-toggle input { width: 14px; height: 14px; }
+    .btn-mini.pill { border-radius: 999px; padding: 6px 12px; font-weight: 700; }
+    .time-axis { position: relative; margin-top: 4px; padding-left: 12px; display: grid; gap: 8px; }
+    .time-axis:before { content: ""; position: absolute; left: 4px; top: 2px; bottom: 2px; width: 2px; background: #dbe2ec; }
+    .time-node { position: relative; padding-left: 10px; }
+    .time-node:before { content: ""; position: absolute; left: -12px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; }
+    .mobilize-line { font-size: 14px; color: #334155; line-height: 1.4; }
+    .mobilize-note { color: #64748b; }
+    .mobilize-line b { font-weight: 700; color: #334155; }
+    .room-card {
+      border: 1px solid #dbe2ec;
+      border-radius: 10px;
+      background: #f8fafc;
+      padding: 8px;
+      margin-top: 6px;
+    }
+    .room-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .room-detail { margin-top: 6px; border-top: 1px dashed #dbe2ec; padding-top: 6px; display: none; }
+    .room-card.open .room-detail { display: block; }
 
 
     @media (max-width: 380px) {
@@ -1040,6 +1325,12 @@
       .list-item {
         grid-template-columns: 1fr;
         gap: 8px;
+      }
+      .archive-grid {
+        grid-template-columns: repeat(2, minmax(0,1fr));
+      }
+      .person-insure-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
       .side-metric {
         width: 100%;
@@ -1125,6 +1416,11 @@
         right: 0;
         border-radius: 14px 14px 0 0;
       }
+      .archive-sheet {
+        width: 100vw;
+        max-width: 100vw;
+        margin: 0;
+      }
       .cond-panel {
         width: min(340px, 92vw);
       }
@@ -1193,7 +1489,7 @@
     <div class="drawer-head">
       <strong id="drawerTitle">明细名单</strong>
       <div class="drawer-head-right">
-        <button class="btn-mini" id="drawerClose">关闭</button>
+        <button class="btn-mini" id="drawerClose">返回</button>
       </div>
     </div>
     <div class="filters">
@@ -1224,8 +1520,31 @@
     </div>
     <div id="drawerList"></div>
   </div>
+  <div class="archive-modal" id="archiveModal">
+    <div class="archive-sheet">
+      <div class="archive-head">
+        <div>
+          <div class="archive-title" id="archiveTitle">对象档案</div>
+          <div class="archive-sub" id="archiveSub">完整医保参保缴费情况档案</div>
+        </div>
+        <button class="btn-mini" id="archiveClose">返回</button>
+      </div>
+      <div id="archiveBody"></div>
+    </div>
+  </div>
 
   <script>
+    const ROAD_COMMUNITY_MAP = {
+      九龙园区大道: "九龙园区社区",
+      渝州路: "渝州路社区",
+      科园一路: "科园一路社区",
+      石杨路: "石桥铺社区",
+      前进路: "前进路社区",
+      天兴路: "天兴路社区",
+      团结路: "团结路社区",
+      铝城大道: "铝城村"
+    };
+
     const STAFF_CONFIG = {
       // 职工参保人员细类口径（合计建议为 1）
       detailRatio: {
@@ -1268,30 +1587,140 @@
     const data = {
       district: "重庆市九龙坡区",
       streets: [
-        { name: "杨家坪街道", villages: [mkVillage("天兴路社区", 1820, 1660), mkVillage("前进路社区", 1460, 1320), mkVillage("团结路社区", 1300, 1156)] },
-        { name: "石桥铺街道", villages: [mkVillage("渝州路社区", 2100, 1908), mkVillage("高新区社区", 1740, 1586), mkVillage("科园一路社区", 980, 824)] },
-        { name: "西彭镇", villages: [mkVillage("西彭社区", 2020, 1830), mkVillage("森迪村", 1210, 1038), mkVillage("铝城村", 1160, 948)] }
+        { name: "杨家坪街道", villages: [mkVillage("杨家坪街道", "天兴路社区", 1820, 1660), mkVillage("杨家坪街道", "前进路社区", 1460, 1320), mkVillage("杨家坪街道", "团结路社区", 1300, 1156)] },
+        { name: "石桥铺街道", villages: [mkVillage("石桥铺街道", "渝州路社区", 2100, 1908), mkVillage("石桥铺街道", "高新区社区", 1740, 1586), mkVillage("石桥铺街道", "科园一路社区", 980, 824)] },
+        { name: "西彭镇", villages: [mkVillage("西彭镇", "西彭社区", 2020, 1830), mkVillage("西彭镇", "森迪村", 1210, 1038), mkVillage("西彭镇", "铝城村", 1160, 948)] }
       ]
     };
 
-    function mkVillage(name, target, current) {
+    function formatStdAddress(admin, road, doorNo, floorNo, roomNo) {
+      return `${admin}${road}${doorNo}号${Number(floorNo)}层${String(roomNo).padStart(2, "0")}室`;
+    }
+    function parseStdAddress(addr) {
+      if (!addr) return null;
+      const m = String(addr).match(/^(.*?(?:街道|镇))(.*?)(\d+)号(\d+)层(\d+)室$/);
+      if (!m) return null;
+      return {
+        admin: m[1],
+        road: m[2],
+        doorNo: Number(m[3]),
+        floorNo: Number(m[4]),
+        roomNo: Number(m[5]),
+        buildingKey: `${m[1]}${m[2]}${m[3]}号`,
+        roomKey: `${m[4]}层${m[5]}室`
+      };
+    }
+    function getManagementAreaFromAddress(addr) {
+      const parsed = parseStdAddress(addr);
+      if (!parsed) return "-";
+      const community = ROAD_COMMUNITY_MAP[parsed.road] || `${parsed.road}社区`;
+      return `${parsed.admin}${community}`;
+    }
+    function parseBuildingKey(buildingKey) {
+      if (!buildingKey) return null;
+      const m = String(buildingKey).match(/^(.*?(?:街道|镇))(.*?)(\d+)号$/);
+      if (!m) return null;
+      return { admin: m[1], road: m[2], doorNo: Number(m[3]) };
+    }
+    function getManagementAreaFromBuildingKey(buildingKey) {
+      const parsed = parseBuildingKey(buildingKey);
+      if (!parsed) return "-";
+      const community = ROAD_COMMUNITY_MAP[parsed.road] || `${parsed.road}社区`;
+      return `${parsed.admin}${community}`;
+    }
+    function getBuildingAreaType(buildingKey) {
+      const parsed = parseBuildingKey(buildingKey);
+      const road = parsed ? parsed.road : "";
+      if (["九龙园区大道", "铝城大道"].includes(road)) return "工业园区";
+      if (["渝州路", "石杨路", "科园一路"].includes(road)) return "商业圈";
+      if (["前进路", "天兴路", "团结路"].includes(road)) return "生活小区";
+      return "其他";
+    }
+    function runRelationAudit() {
+      const villages = data.streets.flatMap(s => s.villages || []);
+      const issues = [];
+      villages.forEach(v => {
+        const rs = v.residents || [];
+        const es = v.enterprises || [];
+
+        // 1) 同户（familyId）应共享同一户籍地址
+        const familyAddrMap = new Map();
+        rs.forEach(r => {
+          if (!r.familyId) return;
+          if (!familyAddrMap.has(r.familyId)) familyAddrMap.set(r.familyId, new Set());
+          if (r.hukouAddress) familyAddrMap.get(r.familyId).add(r.hukouAddress);
+        });
+        familyAddrMap.forEach((addrSet, familyId) => {
+          if (addrSet.size > 1) {
+            issues.push(`[户址不一致] ${v.name} ${familyId} -> ${[...addrSet].join(" | ")}`);
+          }
+        });
+
+        // 2) 企业员工可按注册地址归集到楼栋（用于一楼一档）
+        const entBuilding = new Map();
+        es.forEach(e => {
+          const p = parseStdAddress(e.regAddress);
+          if (p) entBuilding.set(e.id, p.buildingKey);
+        });
+        const buildingStaffCount = new Map();
+        rs.forEach(r => {
+          if (!r.employerId) return;
+          const bk = entBuilding.get(r.employerId);
+          if (!bk) return;
+          buildingStaffCount.set(bk, (buildingStaffCount.get(bk) || 0) + 1);
+        });
+        es.forEach(e => {
+          const staffCnt = rs.filter(r => r.employerId === e.id).length;
+          const bk = entBuilding.get(e.id);
+          if (!bk) return;
+          const groupedCnt = buildingStaffCount.get(bk) || 0;
+          if (staffCnt > 0 && groupedCnt === 0) {
+            issues.push(`[楼栋归集异常] ${v.name} ${e.name} staff=${staffCnt} building=${bk}`);
+          }
+        });
+      });
+      if (issues.length) {
+        console.warn(`[关系校验] 发现 ${issues.length} 个问题`, issues.slice(0, 20));
+      } else {
+        console.info("[关系校验] 通过：人/户/企/楼关联一致。");
+      }
+    }
+    runRelationAudit();
+
+    function mkVillage(streetName, name, target, current) {
       const uninsured = Math.max(target - current, 0);
       const villageSalt = Array.from(name).reduce((s, ch) => s + ch.charCodeAt(0), 0);
       const residentPool = ["李明", "张华", "王芳", "赵刚", "周婷", "陈俊", "杨雪", "吴鹏", "刘洋", "黄敏", "何磊", "宋佳", "邓洁", "潘凯", "周文", "何杰"];
       const companyPool = ["宏达科技", "九龙物流", "渝新制造", "兴业商贸", "巴渝建工", "成信餐饮", "腾跃电子", "弘博服务", "云创医疗", "华腾教育"];
-      const industries = ["制造", "物流", "建筑", "餐饮", "服务", "电子", "医疗", "教育"];
+      const industries = ["制造业", "建筑业", "批发和零售业", "交通运输、仓储和邮政业", "住宿和餐饮业", "信息传输、软件和信息技术服务业", "金融业", "房地产业", "租赁和商务服务业", "教育", "卫生和社会工作"];
       const scales = ["小微", "中型", "大型"];
+      const unitTypes = ["企业", "个体", "机关", "事业", "社会组织"];
+      const unitNatures = ["国企", "民企", "混合", "外资", "中外合资"];
       const lossReasons = ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"];
-      const hukouStreet = ["杨家坪正街", "石桥铺渝州路", "西彭铝城大道", "九龙园区大道", "科园一路"];
-      const liveStreet = ["天兴路", "前进路", "团结路", "渝州路", "高新区路", "科园一路"];
+      const roadPool = ["九龙园区大道", "渝州路", "科园一路", "石杨路", "前进路", "天兴路", "团结路", "铝城大道"];
+      const hukouAdminPool = [
+        `重庆市九龙坡区${streetName}`,
+        "重庆市九龙坡区杨家坪街道",
+        "重庆市九龙坡区石桥铺街道",
+        "重庆市九龙坡区西彭镇"
+      ];
+      const liveAdminPool = {
+        "本辖区": `重庆市九龙坡区${streetName}`,
+        "区内其他辖区": streetName === "杨家坪街道" ? "重庆市九龙坡区石桥铺街道" : "重庆市九龙坡区杨家坪街道",
+        "市内外区": "重庆市渝中区上清寺街道",
+        "市外": "四川省成都市武侯区簇锦街道"
+      };
 
       let underageStaffCorrected = 0;
       const residents = Array.from({ length: Math.max(Math.floor(uninsured * 0.7), 24) }, (_, i) => {
         const serial = (villageSalt % 89) * 1000 + (i + 1);
+        const familyIndex = Math.floor(i / 3);
+        const familyMemberIndex = i % 3;
+        const familySeed = familyIndex + villageSalt;
         const addrSeed = i + villageSalt;
         const age = (i * 4) % 76;
         const gender = i % 2 === 0 ? "男" : "女";
-        const household = i % 3 === 0 ? "本区户籍" : "非本区户籍";
+        const household = familySeed % 3 === 0 ? "本区户籍" : "非本区户籍";
         let residenceDetail = "本辖区";
         if (household === "本区户籍") {
           const m = i % 20;
@@ -1341,14 +1770,24 @@
         const ageGroup = age <= 16 ? "16岁及以下" : age <= 30 ? "16-30岁" : age <= 45 ? "31-45岁" : age <= 60 ? "46-60岁" : "60岁以上";
         const phoneMid = ((500000000 + addrSeed * 97) % 1000000000).toString().padStart(9, "0");
         const phone = `13${phoneMid}`;
-        const hukouAddress = `重庆市九龙坡区${hukouStreet[addrSeed % hukouStreet.length]}${(addrSeed % 120) + 1}号`;
-        const livingAddress = residenceDetail === "本辖区"
-          ? `重庆市九龙坡区${name}${liveStreet[addrSeed % liveStreet.length]}${(addrSeed % 60) + 1}号`
-          : (residenceDetail === "区内其他辖区"
-            ? `重庆市九龙坡区其他辖区${(addrSeed % 90) + 1}号`
-            : (residenceDetail === "市内外区"
-              ? `重庆市主城其他区${(addrSeed % 130) + 1}号`
-              : `重庆市外地区${(addrSeed % 220) + 1}号`));
+        // 户籍地址按“户”维度生成：同一familyId成员共用同一户籍地址
+        const hukouRoad = roadPool[familySeed % roadPool.length];
+        const hukouDoorNo = (familySeed % 120) + 1;
+        const hukouFloorNo = (familySeed % 22) + 1;
+        const hukouRoomNo = (familySeed % 4) + 1;
+        const hukouAdmin = hukouAdminPool[familySeed % hukouAdminPool.length];
+        const hukouAddress = formatStdAddress(hukouAdmin, hukouRoad, hukouDoorNo, hukouFloorNo, hukouRoomNo);
+
+        const liveRoad = roadPool[(addrSeed + 3) % roadPool.length];
+        const liveDoorNo = (addrSeed % 120) + 1;
+        const liveFloorNo = (addrSeed % 22) + 1;
+        const liveRoomNo = ((addrSeed + 1) % 4) + 1;
+        const liveAdmin = liveAdminPool[residenceDetail] || liveAdminPool["本辖区"];
+        const livingAddress = formatStdAddress(liveAdmin, liveRoad, liveDoorNo, liveFloorNo, liveRoomNo);
+        const liveParsed = parseStdAddress(livingAddress);
+        const hukouParsed = parseStdAddress(hukouAddress);
+        const familyId = `F-${name}-${familyIndex}`;
+        const familyRole = ["户主", "配偶", "子女"][familyMemberIndex] || "成员";
         return {
           id: `R-${name}-${serial}`,
           type: "居民",
@@ -1360,6 +1799,18 @@
           hardshipType,
           isPrimarySecondary, isCollege, isHardship,
           keyGroup, lastYearPaid, lastYearLocalPaid, thisYearPaid, thisYearType, stockChangeType, lossReason, pauseFlow,
+          familyId, familyRole,
+          buildingId: liveParsed ? liveParsed.buildingKey : "",
+          buildingName: liveParsed ? liveParsed.buildingKey : "",
+          floorNo: liveParsed ? liveParsed.floorNo : 1,
+          roomNo: liveParsed ? String(liveParsed.roomNo).padStart(2, "0") : "01",
+          roomId: liveParsed ? `${liveParsed.buildingKey}-${liveParsed.roomKey}` : "",
+          hukouBuildingId: hukouParsed ? hukouParsed.buildingKey : "",
+          hukouFloorNo: hukouParsed ? hukouParsed.floorNo : 1,
+          hukouRoomNo: hukouParsed ? String(hukouParsed.roomNo).padStart(2, "0") : "01",
+          hukouRoomId: hukouParsed ? `${hukouParsed.buildingKey}-${hukouParsed.roomKey}` : "",
+          employerId: "",
+          employerName: "",
           duration: 1 + (i % 8),
           place: name
         };
@@ -1376,6 +1827,15 @@
         const rand2 = seededRand((current + i + 19) * 29);
         const staffInsured = rand1 < STAFF_CONFIG.unitInsuredRate;
         const lastMonthStaffInsured = rand2 < STAFF_CONFIG.unitInsuredRateLastMonth;
+        const regAdmin = `重庆市九龙坡区${streetName}`;
+        const regRoad = roadPool[(addrSeed + 5) % roadPool.length];
+        const regDoorNo = (addrSeed % 120) + 1;
+        const regFloorNo = (addrSeed % 18) + 1;
+        const regRoomNo = ((addrSeed + 2) % 6) + 1;
+        const unitType = unitTypes[(addrSeed + 1) % unitTypes.length];
+        const industryClass = industries[(addrSeed + 3) % industries.length];
+        const unitNature = unitNatures[(addrSeed + 5) % unitNatures.length];
+        const managementArea = getManagementAreaFromAddress(formatStdAddress(regAdmin, regRoad, regDoorNo, regFloorNo, regRoomNo));
         return {
           id: `E-${name}-${serial}`,
           type: "企业",
@@ -1383,11 +1843,15 @@
           legalPerson: ["李强", "王磊", "张敏", "赵军", "陈涛"][i % 5],
           contactPerson: ["刘经理", "周主管", "黄主任", "何女士", "杨先生"][i % 5],
           phone: `18${((300000000 + addrSeed * 61) % 1000000000).toString().padStart(9, "0")}`,
-          regAddress: `重庆市九龙坡区${name}${(addrSeed % 80) + 1}号`,
+          regAddress: formatStdAddress(regAdmin, regRoad, regDoorNo, regFloorNo, regRoomNo),
+          managementArea,
+          unitType,
+          industryClass,
+          unitNature,
           reason: i % 2 === 0 ? "欠费超3个月" : "缴费基数做实率偏低",
           duration: 2 + (i % 10),
           gapRate: 8 + (i % 15),
-          industry: industries[i % industries.length],
+          industry: industryClass,
           scale: scales[i % scales.length],
           staffInsured,
           lastMonthStaffInsured,
@@ -1395,6 +1859,26 @@
           place: name
         };
       });
+      const localStaff = residents.filter(r => r.thisYearType === "职工保");
+      localStaff.forEach((r, i) => {
+        const company = enterprises[i % enterprises.length];
+        if (company) {
+          r.employerId = company.id;
+          r.employerName = company.name;
+        }
+      });
+      // 补充“历史关联员工”，用于企业档案展示停保/转保等状态
+      residents
+        .filter(r => r.age >= 18 && !r.employerId)
+        .forEach((r, i) => {
+          if (seededRand((villageSalt + i + target + current) * 37) > 0.2) return;
+          const company = enterprises[(i * 3 + villageSalt) % enterprises.length];
+          if (!company) return;
+          r.employerId = company.id;
+          r.employerName = company.name;
+          if (!r.staffBigType) r.staffBigType = "单位参保";
+          if (!r.staffDetailType) r.staffDetailType = r.age >= 55 ? "单位退休人员" : "在职职工";
+        });
 
       return { name, target, current, residents, enterprises };
     }
@@ -1407,6 +1891,7 @@
       street: data.streets[0].name,
       village: data.streets[0].villages[0].name,
       drawer: null,
+      archive: null,
       showFullPhone: false,
       areaRankSort: "total",
       areaRankExpanded: false,
@@ -1533,6 +2018,11 @@
       searchSecond: document.getElementById("searchSecond"),
       searchAddress: document.getElementById("searchAddress"),
       drawerList: document.getElementById("drawerList")
+      ,
+      archiveModal: document.getElementById("archiveModal"),
+      archiveTitle: document.getElementById("archiveTitle"),
+      archiveSub: document.getElementById("archiveSub"),
+      archiveBody: document.getElementById("archiveBody")
     };
 
     const identityProfiles = {
@@ -1648,9 +2138,9 @@
       els.villageSelect.style.display = state.level === "village" ? "block" : "none";
 
       let viewing = "当前查看：";
-      if (state.level === "district") viewing += `${data.district}（区级）`;
-      if (state.level === "street") viewing += `${state.street}（镇街）`;
-      if (state.level === "village") viewing += `${state.street} · ${state.village}（村居）`;
+      if (state.level === "district") viewing += `${data.district}`;
+      if (state.level === "street") viewing += `${state.street}`;
+      if (state.level === "village") viewing += `${state.street} · ${state.village}`;
       viewing += ` · ${state.insuranceYear}年度`;
       els.viewingText.textContent = viewing;
       els.viewingText.style.display = p.roles.includes("leader") ? "block" : "none";
@@ -2453,6 +2943,7 @@
 
     function openDrawer(mode) {
       state.drawer = mode;
+      closeArchive();
       const titleMap = {
         target_all: "目标覆盖对象名单",
         target_staff: "职工保目标对象名单",
@@ -2527,11 +3018,19 @@
       if (mode && mode.startsWith("key_") && !mode.startsWith("key_insured_") && !mode.startsWith("key_uninsured_")) titleMap[mode] = `重点对象：${mode.replace("key_", "")}`;
       if (mode && mode.startsWith("loss_")) titleMap[mode] = `减员原因：${mode.replace("loss_", "")}`;
       els.drawerTitle.textContent = titleMap[mode] || "明细名单";
-      els.drawerType.innerHTML = `<option value="all">全部</option><option value="居民">居民</option><option value="企业">企业</option>`;
+      if (isResidentOnlyDrillMode(mode)) {
+        els.drawerType.innerHTML = `<option value="居民">居民</option>`;
+      } else if (isEnterpriseOnlyDrillMode(mode)) {
+        els.drawerType.innerHTML = `<option value="企业">企业</option>`;
+      } else {
+        els.drawerType.innerHTML = `<option value="all">全部</option><option value="居民">居民</option><option value="企业">企业</option>`;
+      }
       const baseItems = getDrawerItems(mode);
       const typeSet = new Set(baseItems.map(x => x.type));
       const defaults = inferDefaultFilters(mode);
-      els.drawerType.value = defaults.type || (typeSet.size === 1 ? [...typeSet][0] : "all");
+      const fallbackType = typeSet.size === 1 ? [...typeSet][0] : "all";
+      const preferredType = (defaults.type && defaults.type !== "all") ? defaults.type : fallbackType;
+      els.drawerType.value = preferredType;
       state.selectedTags = defaults.tags || [];
       // 年龄下钻强制兜底：锁定居民并清空标签，避免历史状态导致0条
       if (mode && (mode.startsWith("age_") || mode.startsWith("age_gender|"))) {
@@ -2544,8 +3043,8 @@
       updateQueryPlaceholders();
       renderConditionPanel();
       renderDrawerList();
-      els.overlay.classList.add("show");
       els.drawer.classList.add("show");
+      document.body.classList.add("page-lock");
     }
 
     function maskPhone(v) {
@@ -2555,9 +3054,9 @@
     }
 
     function inferDefaultFilters(mode) {
-      const out = { type: "all", tags: [] };
+      const out = { type: "", tags: [] };
       if (mode.startsWith("risk_") || mode.startsWith("staff_unit_")) out.type = "企业";
-      if (mode.startsWith("flow_") || mode.startsWith("age_") || mode.startsWith("age_gender|") || mode.startsWith("key_") || mode.startsWith("hh_") || mode.startsWith("loss_") || mode.startsWith("worker_") || mode.startsWith("stock_") || mode.startsWith("inc_")) out.type = "居民";
+      if (mode.startsWith("flow_") || mode.startsWith("age_") || mode.startsWith("age_gender|") || mode.startsWith("gender_") || mode.startsWith("key_") || mode.startsWith("hh_") || mode.startsWith("loss_") || mode.startsWith("worker_") || mode.startsWith("stock_") || mode.startsWith("inc_")) out.type = "居民";
       const map = {
         risk_high: ["高"],
         risk_medium: ["中"],
@@ -2613,6 +3112,18 @@
     }
 
     function updateQueryPlaceholders() {
+      if (isResidentOnlyDrillMode(state.drawer)) {
+        els.searchName.placeholder = "居民姓名（模糊）";
+        els.searchSecond.placeholder = "联系电话（模糊）";
+        els.searchAddress.placeholder = "地址（户籍/居住，模糊）";
+        return;
+      }
+      if (isEnterpriseOnlyDrillMode(state.drawer)) {
+        els.searchName.placeholder = "企业名称（模糊）";
+        els.searchSecond.placeholder = "联系人（模糊）";
+        els.searchAddress.placeholder = "企业地址（模糊）";
+        return;
+      }
       const t = els.drawerType.value || "all";
       if (t === "企业") {
         els.searchName.placeholder = "企业名称（模糊）";
@@ -2627,6 +3138,20 @@
         els.searchSecond.placeholder = "联系电话/联系人（模糊）";
         els.searchAddress.placeholder = "地址（户籍/居住/企业地址，模糊）";
       }
+    }
+
+    function isResidentOnlyDrillMode(mode) {
+      if (!mode) return false;
+      if (mode.startsWith("gender_")) return true;
+      if (mode.startsWith("age_") || mode.startsWith("age_gender|")) return true;
+      if (mode === "staff_people_all" || mode === "staff_big_unit" || mode === "staff_big_personal") return true;
+      if (mode.startsWith("staff_detail_")) return true;
+      return false;
+    }
+
+    function isEnterpriseOnlyDrillMode(mode) {
+      if (!mode) return false;
+      return mode.startsWith("risk_") || mode.startsWith("staff_unit_");
     }
 
     function renderDrawerList() {
@@ -2665,14 +3190,75 @@
       if (kwAddr) summaryParts.push(`址:${kwAddr}`);
       els.drawerResultText.textContent = `当前筛选结果：${items.length} 条${summaryParts.length ? " · " + summaryParts.join(" / ") : ""}`;
       els.drawerList.innerHTML = (items.map(x => {
-        const tags = getTags(x).map(t => `<span class="tag ${t.level}">${t.text}</span>`).join("");
-        const rightTop = x.type === "居民" ? unitText(x.age || 0, "岁") : `<span class="side-label">差异率</span>${unitText(x.gapRate || 0, "%")}`;
-        const rightBottom = unitText(x.duration || 0, "月");
+        const tags = getCardTags(x).map(renderCardTag).join("");
+        const title = x.type === "居民"
+          ? `<button class="link-btn archive-open" data-archive-type="person" data-id="${x.id}"><b>${x.name}</b></button>`
+          : `<button class="link-btn archive-open" data-archive-type="enterprise" data-id="${x.id}"><b>${x.name}</b></button>`;
         const ext = x.type === "居民"
-          ? `<div class="mini">联系电话：${maskPhone(x.phone)}</div><div class="mini">户籍地址：${x.hukouAddress || "-"}</div><div class="mini">居住地址：${x.livingAddress || "-"}</div>`
-          : `<div class="mini">法人代表：${x.legalPerson || "-"}</div><div class="mini">联系人：${x.contactPerson || "-"} · ${maskPhone(x.phone)}</div><div class="mini">注册地址：${x.regAddress || "-"}</div>`;
-        return `<div class="list-item"><div><div><b>${x.name}</b> <span class="mini">${x.type}</span></div><div class="mini">${x.place} · ${x.reason || ""}</div>${ext}<div class="tags">${tags}</div></div><div class="side-metric"><div class="row">${rightTop}</div><div class="row">${rightBottom}</div></div></div>`;
+          ? `<div class="mini">联系电话：${maskPhone(x.phone)}</div>
+             <div class="mini">户籍地址：<button class="link-btn archive-meta" data-archive-type="building-by-address" data-id="${x.id}" data-address-kind="hukou">${x.hukouAddress || "-"}</button></div>
+             <div class="mini">居住地址：<button class="link-btn archive-meta" data-archive-type="building-by-address" data-id="${x.id}" data-address-kind="live">${x.livingAddress || "-"}</button></div>
+             `
+          : `<div class="mini">法人代表：${x.legalPerson || "-"}</div>
+             <div class="mini">联系人：${x.contactPerson || "-"} · ${maskPhone(x.phone)}</div>
+             <div class="mini">注册地址：<button class="link-btn archive-meta" data-archive-type="building-by-enterprise" data-id="${x.id}">${x.regAddress || "-"}</button></div>`;
+        return `<div class="list-item"><div><div>${title}</div><div class="mini">${x.place} · ${x.reason || ""}</div>${ext}<div class="tags">${tags}</div></div></div>`;
       }).join("") || '<div class="mini">暂无匹配对象</div>');
+      els.drawerList.querySelectorAll("[data-archive-type]").forEach(el => {
+        el.onclick = (e) => {
+          e.preventDefault();
+          const type = el.dataset.archiveType;
+          const id = el.dataset.id;
+          if (type === "person") return openArchive("person", id);
+          if (type === "enterprise") return openArchive("enterprise", id);
+          if (type === "household") return openArchive("household", id);
+          if (type === "building") return openArchive("building", id);
+          if (type === "building-by-address") return openArchive("building", id, { addressKind: el.dataset.addressKind || "live" });
+          if (type === "building-by-enterprise") return openArchive("buildingByEnterprise", id);
+        };
+      });
+    }
+
+    function renderCardTag(tag) {
+      if (!tag || !tag.text) return "";
+      const base = `tag ${tag.level || ""}`.trim();
+      if (tag.text === "新生儿") return '<span class="tag key-newborn">新生儿</span>';
+      if (tag.text === "资助对象") return '<span class="tag key-hardship">资助对象</span>';
+      return `<span class="${base}">${tag.text}</span>`;
+    }
+
+    function getCardTags(x) {
+      if (x.type === "居民") {
+        const insureType = x.thisYearType || (x.thisYearPaid ? "居民保" : "未参保");
+        const insureStatus = x.thisYearPaid ? "已参保" : "未参保";
+        const insurePlace = x.thisYearPaid ? (x.insuredPlace || "参保地待核") : "参保地待核";
+        const subtitleTags = [
+          { text: x.gender || "", level: "" },
+          { text: `${x.age || 0}岁`, level: "" },
+          ...(x.keyGroup && x.keyGroup !== "无" ? [{ text: x.keyGroup, level: "warn" }] : []),
+          { text: x.household || "", level: "" },
+          { text: x.residence || "", level: "" }
+        ].filter(t => t.text);
+        const insureTags = [
+          { text: insureStatus, level: insureStatus === "未参保" ? "danger" : "ok" },
+          { text: insureType, level: insureType === "未参保" ? "danger" : "ok" },
+          { text: insurePlace, level: x.thisYearPaid ? "ok" : "warn" }
+        ];
+        return [...subtitleTags, ...insureTags];
+      }
+
+      const subtitleTags = [
+        { text: x.unitType || "", level: "" },
+        { text: x.industryClass || "", level: "" },
+        { text: x.unitNature || "", level: "" }
+      ].filter(t => t.text);
+      const insureTag = { text: x.staffInsured ? "正常参保" : "未参保", level: x.staffInsured ? "ok" : "danger" };
+      const riskTags = [
+        ...(x.risk ? [{ text: x.risk, level: x.risk === "高" ? "danger" : (x.risk === "中" ? "warn" : "ok") }] : []),
+        ...(x.reason ? [{ text: x.reason, level: x.risk === "高" ? "danger" : "warn" }] : []),
+        { text: `欠费${x.duration || 0}月`, level: "warn" }
+      ];
+      return [...subtitleTags, insureTag, ...riskTags];
     }
 
     function getTags(x) {
@@ -2711,10 +3297,783 @@
       ];
     }
 
-    function closeDrawer() {
-      els.drawer.classList.remove("show");
-      els.overlay.classList.remove("show");
+    function allResidents() {
+      return currentNode().residents || [];
+    }
+    function allEnterprises() {
+      return currentNode().enterprises || [];
+    }
+    function byId(list, id) {
+      return list.find(x => x.id === id) || null;
+    }
+    function kpiCard(label, valueHtml) {
+      return `<div class="archive-kpi"><div class="k">${label}</div><div class="v">${valueHtml}</div></div>`;
+    }
+    function lineRow(label, valueHtml) {
+      return `<div class="archive-line"><span>${label}</span><b>${valueHtml}</b></div>`;
+    }
+    function makeEnterpriseTrendSeries(ent, currentCount) {
+      const y = Number(state.insuranceYear || new Date().getFullYear());
+      const monthNow = Math.max(1, Math.min(12, new Date().getMonth() + 1));
+      const base = Math.max(Number(currentCount || 0), 0);
+      const vals = [];
+      for (let m = 1; m <= 12; m += 1) {
+        const wave = Math.sin((m + ent.id.length) * 0.8) * Math.max(2, base * 0.03);
+        const noise = (seededRand((y + m + ent.id.length) * 41) - 0.5) * Math.max(4, base * 0.06);
+        const trend = (m - 6) * Math.max(0.2, base * 0.002);
+        vals.push(m <= monthNow ? Math.max(0, Math.round(base + wave + noise + trend)) : null);
+      }
+      vals[monthNow - 1] = base;
+      return { year: y, monthNow, vals };
+    }
+    function renderEnterpriseTrendSvg(vals, monthNow) {
+      if (!vals || !vals.length) return "";
+      const w = 360;
+      const h = 150;
+      const px = 18;
+      const py = 22;
+      const validVals = vals.filter(v => typeof v === "number");
+      if (!validVals.length) return "";
+      const minV = Math.min(...validVals);
+      const maxV = Math.max(...validVals);
+      const span = Math.max(maxV - minV, 1);
+      const step = (w - px * 2) / Math.max(vals.length - 1, 1);
+      const yOf = (v) => (h - py) - ((v - minV) / span) * (h - py * 2);
+      const pts = vals
+        .map((v, i) => (typeof v === "number" ? [px + i * step, yOf(v), v, i + 1] : null))
+        .filter(Boolean);
+      const line = pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+      const area = `M ${pts[0][0].toFixed(1)} ${h - py} L ${line} L ${pts[pts.length - 1][0].toFixed(1)} ${h - py} Z`;
+      const labels = Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+        const x = px + (m - 1) * step;
+        return `<text class="trend-label" x="${x.toFixed(1)}" y="${h - 4}" text-anchor="middle">${m}月</text>`;
+      }).join("");
+      const dots = pts.map((p) => {
+        const cls = p[3] === monthNow ? "trend-dot current" : "trend-dot";
+        return `<circle class="${cls}" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${p[3] === monthNow ? 3.2 : 2.2}"></circle>`;
+      }).join("");
+      const monthVals = pts.map((p) => {
+        const anchor = p[3] === monthNow ? "end" : "middle";
+        const x = p[3] === monthNow ? p[0] - 2 : p[0];
+        const y = Math.max(10, p[1] - 6);
+        return `<text class="trend-point-value" x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}">${p[2]}</text>`;
+      }).join("");
+      const cur = vals[Math.max(monthNow - 1, 0)] || 0;
+      const futureBlank = monthNow < 12
+        ? `<rect x="${(px + monthNow * step + 1).toFixed(1)}" y="${py}" width="${((12 - monthNow) * step).toFixed(1)}" height="${(h - py * 2).toFixed(1)}" fill="#f8fafc"></rect>`
+        : "";
+      return `
+        <svg class="trend-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+          <line class="trend-grid" x1="${px}" y1="${h - py}" x2="${w - px}" y2="${h - py}"></line>
+          <line class="trend-grid" x1="${px}" y1="${py}" x2="${px}" y2="${h - py}"></line>
+          <path class="trend-area" d="${area}"></path>
+          <polyline class="trend-line" points="${line}"></polyline>
+          ${dots}
+          ${futureBlank}
+          ${monthVals}
+          ${labels}
+          <text class="trend-value" x="${w - px}" y="${py - 8}" text-anchor="end">当前：${cur}人</text>
+        </svg>`;
+    }
+    function archiveIcon(type) {
+      const map = {
+        shield: `<svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 5-3.5 7.8-7 9-3.5-1.2-7-4-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>`,
+        card: `<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>`,
+        map: `<svg viewBox="0 0 24 24"><path d="M9 4l6-2v18l-6 2-6-2V6l6-2z"/><path d="M15 2l6 2v14l-6 2"/></svg>`,
+        user: `<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/></svg>`,
+        phone: `<svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 11.2 19 19.3 19.3 0 0 1 5 12.8 19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7l.4 2.6a2 2 0 0 1-.6 1.8L7.2 9.8a16 16 0 0 0 7 7l1.7-1.7a2 2 0 0 1 1.8-.6l2.6.4A2 2 0 0 1 22 16.9z"/></svg>`,
+        pin: `<svg viewBox="0 0 24 24"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>`,
+        home: `<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>`,
+        calendar: `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>`,
+        walk: `<svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="2"/><path d="M7 21l2-6 2 2 1 4M9 9l3 2 2-1 2 2M7 13l2-3"/></svg>`
+      };
+      return map[type] || map.user;
+    }
+    function makeResidentYearRecords(r) {
+      const y = Number(state.insuranceYear || new Date().getFullYear());
+      const years = [y - 3, y - 2, y - 1, y];
+      return years.map((yr, idx) => {
+        if (idx === 3) {
+          return { year: yr, type: r.thisYearType, paid: !!r.thisYearPaid, place: r.insuredPlace || "-", note: r.thisYearPaid ? "当年已登记缴费" : "当年未完成参保缴费" };
+        }
+        if (idx === 2) {
+          return { year: yr, type: r.lastYearPaid ? "居民保" : "未参保", paid: !!r.lastYearPaid, place: r.lastYearLocalPaid ? "本区县参保" : "辖区外参保", note: r.lastYearPaid ? "上年参保基线" : "上年未参保" };
+        }
+        const under18 = Math.max(0, r.age - (y - yr)) < 18;
+        const paid = seededRand((yr + r.id.length) * 13) > 0.2;
+        const type = paid ? (under18 ? "居民保" : (seededRand((yr + r.id.length) * 19) > 0.72 ? "职工保" : "居民保")) : "未参保";
+        return { year: yr, type, paid, place: paid ? (seededRand((yr + r.id.length) * 23) > 0.75 ? "市内外区参保" : "本区县参保") : "-", note: paid ? "历史缴费记录" : "历史未参保记录" };
+      }).sort((a, b) => b.year - a.year);
+    }
+    function makeMobilizeLogs(r) {
+      const y = Number(state.insuranceYear || new Date().getFullYear());
+      const workerPool = ["周网格员", "李网格员", "陈网格员", "杨网格员"];
+      return [
+        { date: `${y}-08-02`, worker: workerPool[r.id.length % 4], content: r.thisYearPaid ? "完成参保登记，纳入已参保台账" : "未完成参保，列入持续动员对象" },
+        { date: `${y}-06-19`, worker: workerPool[(r.id.length + 1) % 4], content: "社区复访，跟进材料补齐情况" },
+        { date: `${y}-03-08`, worker: workerPool[(r.id.length + 2) % 4], content: "上门走访，说明政策与参保流程" },
+        { date: `${y}-01-12`, worker: workerPool[(r.id.length + 3) % 4], content: "电话提醒，核对参保状态" }
+      ];
+    }
+    function addressOfResident(r, addressKind) {
+      return addressKind === "hukou" ? (r.hukouAddress || "") : (r.livingAddress || "");
+    }
+    function parsedResidentAddr(r, addressKind) {
+      return parseStdAddress(addressOfResident(r, addressKind));
+    }
+    function renderFocusTag(label, mode = "text") {
+      if (!label) return "";
+      if (label === "新生儿") {
+        return mode === "tag"
+          ? '<span class="tag key-newborn">新生儿</span>'
+          : '<span class="key-label-newborn">新生儿</span>';
+      }
+      if (label === "资助对象") {
+        return mode === "tag"
+          ? '<span class="tag key-hardship">资助对象</span>'
+          : '<span class="key-label-hardship">资助对象</span>';
+      }
+      return label;
+    }
+    function formatInsuranceDisplay(type, paid) {
+      const thisType = type || (paid ? "居民保" : "未参保");
+      if (thisType === "未参保") return "未参保";
+      return `${thisType} · ${paid ? "已参保" : "未参保"}`;
+    }
+    function openArchive(kind, id, opts = {}) {
+      const residents = allResidents();
+      const enterprises = allEnterprises();
       els.condPanel.classList.remove("show");
+      if (!els.drawer.classList.contains("show")) return;
+      if (kind === "person") {
+        const r = byId(residents, id);
+        if (!r) return;
+        state.archive = { kind, residentId: id };
+        const keyLabel = r.keyGroup && r.keyGroup !== "无" ? r.keyGroup : "";
+        const keyLabelHtml = renderFocusTag(keyLabel);
+        const baseAttr = [r.gender, `${r.age || 0}岁`, keyLabelHtml, r.household, r.residence].filter(Boolean).join(" / ");
+        const insureType = r.thisYearType || (r.thisYearPaid ? "居民保" : "未参保");
+        const insureDetail = insureType === "职工保" ? (r.staffDetailType || "") : "";
+        const insurePlace = r.thisYearPaid ? (r.insuredPlace || "") : "";
+        let stockTag = "";
+        if (r.lastYearLocalPaid && r.thisYearPaid && insureType === "居民保" && insurePlace === "本区县参保") stockTag = "存量续保";
+        if (!r.lastYearLocalPaid && r.thisYearPaid && insurePlace === "本区县参保") stockTag = "增量扩面";
+        const yearly = makeResidentYearRecords(r);
+        const logs = makeMobilizeLogs(r);
+        els.archiveTitle.textContent = r.name;
+        els.archiveSub.innerHTML = baseAttr || `${r.id} · ${r.place}`;
+        els.archiveBody.innerHTML = `
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("shield")}<span>参保情况</span></div>
+              <span class="stat-time">统计时间：${state.insuranceYear}年度</span>
+            </div>
+            <div class="person-insure-grid">
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>当年参保状态</span></div>
+                <div class="person-insure-value ${r.thisYearPaid ? "" : "person-insure-alert"}">${r.thisYearPaid ? "已参保" : "未参保"}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>参保类型</span></div>
+                <div class="person-insure-value">${insureType}</div>
+                ${insureDetail ? `<div class="person-insure-sub">${insureDetail}</div>` : ""}
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>参保地</span></div>
+                <div class="person-insure-value">${insurePlace || "-"}</div>
+                ${(stockTag || (!r.thisYearPaid ? "未形成存量/增量归类" : "")) ? `<div class="person-insure-sub">${stockTag || "未形成存量/增量归类"}</div>` : ""}
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("user")}<span>基本信息</span></div>
+              <button class="btn-mini pill" id="toHouseholdBtn">查看户档案</button>
+            </div>
+            <div class="basic-info-list">
+              <div class="basic-info-item">
+                ${archiveIcon("phone")}
+                <div>
+                  <div class="k">联系电话</div>
+                  <div class="v archive-phone-line">
+                    <span id="archivePhoneValue">${maskPhone(r.phone)}</span>
+                    <label class="archive-phone-toggle"><input type="checkbox" id="archivePhoneToggle" ${state.showFullPhone ? "checked" : ""}/>显示完整手机号</label>
+                  </div>
+                </div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("card")}
+                <div>
+                  <div class="k">工作单位</div>
+                  <div class="v">${r.employerId ? `<button class="link-btn archive-open" data-to-enterprise="${r.employerId}">${r.employerName || "查看企业档案"}</button>` : "无工作单位"}</div>
+                </div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("pin")}
+                <div>
+                  <div class="k">户籍地址</div>
+                  <div class="v"><button class="link-btn archive-open" data-to-building="${r.id}" data-address-kind="hukou">${r.hukouAddress || "-"}</button></div>
+                </div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("home")}
+                <div>
+                  <div class="k">居住地址</div>
+                  <div class="v"><button class="link-btn archive-open" data-to-building="${r.id}" data-address-kind="live">${r.livingAddress || "-"}</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("calendar")}<span>历年参保情况</span></div>
+            <div class="time-axis">
+              ${yearly.map(y => {
+                const typeHtml = y.type === "未参保" ? `<span class="danger-text">未参保</span>` : y.type;
+                const paidHtml = y.paid ? "已缴费" : `<span class="danger-text">未缴费</span>`;
+                return `<div class="time-node"><div><b>${y.year}年</b> · ${typeHtml} · ${paidHtml}</div><div class="mini">参保地：${y.place}</div><div class="mini">${y.note}</div></div>`;
+              }).join("")}
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("walk")}<span>历次动员情况</span></div>
+            <div class="time-axis">
+              ${logs.map(x => `<div class="time-node"><div class="mobilize-line"><b>${x.date}</b> · ${x.worker}</div><div class="mobilize-line mobilize-note">${x.content}</div></div>`).join("")}
+            </div>
+          </div>`;
+        document.getElementById("toHouseholdBtn").onclick = () => openArchive("household", r.id);
+        const archivePhoneToggle = document.getElementById("archivePhoneToggle");
+        const archivePhoneValue = document.getElementById("archivePhoneValue");
+        if (archivePhoneToggle && archivePhoneValue) {
+          archivePhoneToggle.onchange = () => {
+            state.showFullPhone = !!archivePhoneToggle.checked;
+            archivePhoneValue.textContent = maskPhone(r.phone);
+          };
+        }
+        els.archiveBody.querySelectorAll("[data-to-enterprise]").forEach(el => {
+          el.onclick = () => openArchive("enterprise", el.dataset.toEnterprise);
+        });
+        els.archiveBody.querySelectorAll("[data-to-building]").forEach(el => {
+          el.onclick = () => openArchive("building", el.dataset.toBuilding, { addressKind: el.dataset.addressKind || "live" });
+        });
+      }
+
+      if (kind === "enterprise") {
+        const e = byId(enterprises, id);
+        if (!e) return;
+        state.archive = { kind, enterpriseId: id };
+        const staff = residents.filter(r => r.employerId === e.id);
+        const staffCurrent = staff.filter(r => r.thisYearType === "职工保" && r.thisYearPaid);
+        const insuredStaff = staffCurrent.length;
+        const unStaff = Math.max(staff.length - insuredStaff, 0);
+        const insuredRate = ratio(insuredStaff, Math.max(staff.length, 1));
+        const unitStatusText = e.staffInsured ? "正常参保" : "未参保";
+        const staffBigDefs = ["单位参保", "个人参保（灵活就业）"];
+        const staffDetailDefs = ["在职职工", "单位退休人员", "灵活就业（一档）", "灵活就业（二档）", "个人退休（一档）", "个人退休（二档）"];
+        const bigStats = staffBigDefs.map(k => ({ key: k, count: staffCurrent.filter(r => (r.staffBigType || "") === k).length }));
+        const detailStats = staffDetailDefs.map(k => ({ key: k, count: staffCurrent.filter(r => (r.staffDetailType || "") === k).length }));
+        const statMonth = Math.max(1, Math.min(12, new Date().getMonth() + 1));
+        const trendData = makeEnterpriseTrendSeries(e, insuredStaff);
+        const staffRows = staff
+          .map(s => {
+            const detail = s.staffDetailType || (s.age >= 55 ? "单位退休人员" : "在职职工");
+            const big = s.staffBigType || (detail.includes("灵活就业") || detail.includes("个人退休") ? "个人参保（灵活就业）" : "单位参保");
+            const jobStatus = detail.includes("退休") ? "退休" : "在职";
+            const isPause = (!s.thisYearPaid) || s.stockChangeType === "停保" || s.pauseFlow === "申请停保";
+            let insureStatusText = "正常参保";
+            let insureStatusLevel = "";
+            if (isPause) {
+              insureStatusText = `停保${unitText(s.duration || 0, "月")}`;
+              insureStatusLevel = "warn";
+            } else if (s.thisYearType === "居民保") {
+              insureStatusText = "转居民保";
+              insureStatusLevel = "danger";
+            } else if (s.thisYearType === "未参保") {
+              insureStatusText = "未参保";
+              insureStatusLevel = "danger";
+            }
+            return { ...s, detail, big, jobStatus, insureStatusText, insureStatusLevel };
+          })
+          .sort((a, b) => {
+            const pa = a.insureStatusLevel === "warn" || a.insureStatusLevel === "danger" ? 1 : 0;
+            const pb = b.insureStatusLevel === "warn" || b.insureStatusLevel === "danger" ? 1 : 0;
+            return pb - pa;
+          });
+        els.archiveTitle.textContent = e.name;
+        els.archiveSub.textContent = `${e.unitType || "企业"} / ${e.industryClass || "-"} / ${e.unitNature || "-"}`;
+        els.archiveBody.innerHTML = `
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("shield")}<span>参保情况</span></div>
+              <span class="stat-time">统计时间：${state.insuranceYear}年${statMonth}月</span>
+            </div>
+            <div class="person-insure-grid">
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>单位参保状态</span></div>
+                <div class="person-insure-value ${e.staffInsured ? "" : "person-insure-alert"}">${unitStatusText}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>企业风险等级</span></div>
+                <div class="person-insure-value ${e.risk === "高" ? "person-insure-alert" : ""}">${e.risk}风险</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>职工参保率</span></div>
+                <div class="person-insure-value">${insuredRate}%</div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("user")}<span>基本信息</span></div>
+            </div>
+            <div class="basic-info-list">
+              <div class="basic-info-item">
+                ${archiveIcon("user")}
+                <div><div class="k">法人代表</div><div class="v">${e.legalPerson || "-"}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("user")}
+                <div><div class="k">联系人</div><div class="v">${e.contactPerson || "-"}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("phone")}
+                <div>
+                  <div class="k">联系电话</div>
+                  <div class="v archive-phone-line">
+                    <span id="archiveEntPhoneValue">${maskPhone(e.phone)}</span>
+                    <label class="archive-phone-toggle"><input type="checkbox" id="archiveEntPhoneToggle" ${state.showFullPhone ? "checked" : ""}/>显示完整手机号</label>
+                  </div>
+                </div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("pin")}
+                <div><div class="k">注册地址</div><div class="v"><button class="link-btn archive-open" data-to-building-by-enterprise="${e.id}">${e.regAddress || "-"}</button></div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("map")}
+                <div><div class="k">管理属地</div><div class="v">${e.managementArea || "-"}</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("card")}<span>当年度职工参保汇总</span></div>
+            <div class="archive-lines">
+              ${lineRow("企业关联职工总人数", unitText(staff.length, "人"))}
+              ${lineRow("职工保正常参保人数", `<button class="staff-normal-trigger staff-jump-trigger" data-ent-staff-filter=\"normal\">${unitText(insuredStaff, "人")}</button>`)}
+              ${lineRow("停保/转保/未参保人数", `<button class="staff-abn-trigger staff-jump-trigger" data-ent-staff-filter=\"abnormal\">${unitText(unStaff, "人")}</button>`)}
+              ${lineRow("职工保正常参保率", `${insuredRate}%`)}
+              <div class="mini" style="margin-top:4px">按大类（占职工保正常参保人数）</div>
+              ${bigStats.map(x => lineRow(x.key, `${unitText(x.count, "人")} · ${ratio(x.count, Math.max(insuredStaff, 1))}%`)).join("")}
+              <div class="mini" style="margin-top:4px">按细类（占职工保正常参保人数）</div>
+              ${detailStats.map(x => lineRow(x.key, `${unitText(x.count, "人")} · ${ratio(x.count, Math.max(insuredStaff, 1))}%`)).join("")}
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("calendar")}<span>企业参保走势</span></div>
+              <span class="stat-time">统计时间：${state.insuranceYear}年${statMonth}月</span>
+            </div>
+            <div class="mini">当年度按月职工保参保人数变化（用于识别异常波动）</div>
+            <div class="trend-wrap">${renderEnterpriseTrendSvg(trendData.vals, trendData.monthNow)}</div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("walk")}<span>企业参保职工名单</span></div>
+            <div class="staff-filter-row" id="enterpriseStaffFilterRow">
+              <button class="staff-filter-chip active" data-ent-staff-filter="all">全部</button>
+              <button class="staff-filter-chip" data-ent-staff-filter="abnormal">异常（停保/转保/未参保）</button>
+              <button class="staff-filter-chip" data-ent-staff-filter="normal">正常参保</button>
+            </div>
+            <div class="mini" id="enterpriseStaffSummary" style="margin-top:6px"></div>
+            <div class="staff-member-list" id="enterpriseStaffList" style="margin-top:6px"></div>
+            <div style="margin-top:8px; display:flex; justify-content:center;">
+              <button class="btn-mini" id="enterpriseStaffMoreBtn" style="display:none">加载更多</button>
+            </div>
+          </div>`;
+        const archiveEntPhoneToggle = document.getElementById("archiveEntPhoneToggle");
+        const archiveEntPhoneValue = document.getElementById("archiveEntPhoneValue");
+        if (archiveEntPhoneToggle && archiveEntPhoneValue) {
+          archiveEntPhoneToggle.onchange = () => {
+            state.showFullPhone = !!archiveEntPhoneToggle.checked;
+            archiveEntPhoneValue.textContent = maskPhone(e.phone);
+          };
+        }
+        const staffListEl = document.getElementById("enterpriseStaffList");
+        const staffSummaryEl = document.getElementById("enterpriseStaffSummary");
+        const staffMoreBtn = document.getElementById("enterpriseStaffMoreBtn");
+        const PAGE_SIZE = 20;
+        let staffFilter = "all";
+        let page = 1;
+        function matchesFilter(row, filter) {
+          if (filter === "abnormal") return row.insureStatusLevel === "warn" || row.insureStatusLevel === "danger";
+          if (filter === "normal") return row.insureStatusLevel === "";
+          return true;
+        }
+        function renderStaffList() {
+          const filtered = staffRows.filter(x => matchesFilter(x, staffFilter));
+          const shown = filtered.slice(0, page * PAGE_SIZE);
+          if (staffSummaryEl) staffSummaryEl.textContent = `共 ${filtered.length} 人，当前显示 ${shown.length} 人`;
+          if (staffListEl) {
+            staffListEl.innerHTML = shown.length ? shown.map(s => `
+              <div class="staff-member-item">
+                <div class="staff-member-top">
+                  <button class="link-btn archive-open" data-to-person="${s.id}">${s.name}</button>
+                  <span class="staff-member-state ${s.insureStatusLevel}">${s.insureStatusText}</span>
+                </div>
+                <div class="staff-member-meta">${s.jobStatus} · ${s.big} · ${s.detail}</div>
+              </div>`).join("") : '<div class="mini">暂无匹配职工</div>';
+            staffListEl.querySelectorAll("[data-to-person]").forEach(el => {
+              el.onclick = () => openArchive("person", el.dataset.toPerson);
+            });
+          }
+          if (staffMoreBtn) staffMoreBtn.style.display = shown.length < filtered.length ? "inline-flex" : "none";
+        }
+        const entStaffFilterNodes = els.archiveBody.querySelectorAll("[data-ent-staff-filter]");
+        entStaffFilterNodes.forEach(btn => {
+          btn.onclick = () => {
+            staffFilter = btn.dataset.entStaffFilter || "all";
+            page = 1;
+            els.archiveBody.querySelectorAll("[data-ent-staff-filter].staff-filter-chip").forEach(chip => {
+              chip.classList.toggle("active", chip.dataset.entStaffFilter === staffFilter);
+            });
+            renderStaffList();
+            if (btn.classList.contains("staff-jump-trigger") && staffListEl) {
+              staffListEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          };
+        });
+        if (staffMoreBtn) {
+          staffMoreBtn.onclick = () => {
+            page += 1;
+            renderStaffList();
+          };
+        }
+        renderStaffList();
+        els.archiveBody.querySelectorAll("[data-to-person]").forEach(el => {
+          el.onclick = () => openArchive("person", el.dataset.toPerson);
+        });
+        els.archiveBody.querySelectorAll("[data-to-building-by-enterprise]").forEach(el => {
+          el.onclick = () => openArchive("buildingByEnterprise", el.dataset.toBuildingByEnterprise);
+        });
+      }
+
+      if (kind === "household") {
+        const r = byId(residents, id);
+        if (!r) return;
+        let members = residents.filter(x => x.familyId && x.familyId === r.familyId);
+        if (members.length && !members.some(x => x.familyRole === "户主")) {
+          members = members.map((m, idx) => (idx === 0 ? { ...m, familyRole: "户主" } : m));
+        }
+        const householder = members.find(x => x.familyRole === "户主") || members[0] || r;
+        const insured = members.filter(x => x.thisYearPaid).length;
+        const householdInsuredRate = ratio(insured, Math.max(members.length, 1));
+        const statusTag = insured === members.length ? "全员参保" : (insured === 0 ? "无人参保" : "部分参保");
+        const hasStaff = members.some(x => x.thisYearType === "职工保" && x.thisYearPaid);
+        const hasNewborn = members.some(x => x.keyGroup === "新生儿" || (x.age || 0) <= 1);
+        const hasHardship = members.some(x => x.keyGroup === "资助对象" || !!x.hardshipType);
+        const hukouAddrCount = {};
+        members.forEach(m => {
+          const k = m.hukouAddress || "";
+          if (!k) return;
+          hukouAddrCount[k] = (hukouAddrCount[k] || 0) + 1;
+        });
+        const householdAddress = Object.entries(hukouAddrCount).sort((a, b) => b[1] - a[1])[0]?.[0] || householder.hukouAddress || r.hukouAddress || "-";
+        const managementArea = getManagementAreaFromAddress(householdAddress);
+        els.archiveTitle.textContent = `${householder.name || r.name}-户档案`;
+        els.archiveSub.innerHTML = [
+          insured === 0 ? `<span class="danger-text">无人参保</span>` : statusTag,
+          hasStaff ? "有职工保" : "无职工保",
+          hasNewborn ? renderFocusTag("新生儿") : "",
+          hasHardship ? renderFocusTag("资助对象") : ""
+        ].filter(Boolean).join(" / ");
+        els.archiveBody.innerHTML = `
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("shield")}<span>参保情况</span></div>
+              <span class="stat-time">统计时间：${state.insuranceYear}年度</span>
+            </div>
+            <div class="person-insure-grid">
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>户内人数</span></div>
+                <div class="person-insure-value">${unitText(members.length, "人")}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>已参保人数</span></div>
+                <div class="person-insure-value">${unitText(insured, "人")}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>户参保率</span></div>
+                <div class="person-insure-value">${householdInsuredRate}%</div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("user")}<span>基本信息</span></div>
+            </div>
+            <div class="basic-info-list">
+              <div class="basic-info-item">
+                ${archiveIcon("card")}
+                <div><div class="k">家庭户号</div><div class="v">${r.familyId || "-"}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("user")}
+                <div><div class="k">户主姓名</div><div class="v">${householder.name || "-"}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("phone")}
+                <div>
+                  <div class="k">联系电话（户主）</div>
+                  <div class="v archive-phone-line">
+                    <span id="archiveHousePhoneValue">${maskPhone(householder.phone || r.phone)}</span>
+                    <label class="archive-phone-toggle"><input type="checkbox" id="archiveHousePhoneToggle" ${state.showFullPhone ? "checked" : ""}/>显示完整手机号</label>
+                  </div>
+                </div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("pin")}
+                <div><div class="k">户地址</div><div class="v"><button class="link-btn archive-open" data-to-building="${householder.id || r.id}" data-address-kind="hukou">${householdAddress}</button></div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("map")}
+                <div><div class="k">管理属地</div><div class="v">${managementArea}</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("walk")}<span>户成员组成</span></div>
+            <div class="staff-member-list">
+              ${members.map(m => {
+                const relation = m.familyRole || "成员";
+                const keyTag = m.keyGroup && m.keyGroup !== "无" ? m.keyGroup : "";
+                const keyTagText = keyTag ? renderFocusTag(keyTag) : "";
+                const insureType = m.thisYearType === "职工保"
+                  ? `职工保（${m.staffBigType || "单位参保"} / ${m.staffDetailType || "在职职工"}）`
+                  : (m.thisYearType === "居民保" ? "居民保" : "未参保");
+                const paused = !m.thisYearPaid && (m.stockChangeType === "停保" || m.pauseFlow === "申请停保");
+                const insureStatus = paused ? `停保${unitText(m.duration || 0, "月")}` : (m.thisYearPaid ? "已参保" : "未参保");
+                const stateCls = paused ? "warn" : (m.thisYearPaid ? "" : "danger");
+                return `
+                  <div class="staff-member-item">
+                    <div class="staff-member-top">
+                      <button class="link-btn archive-open" data-to-person="${m.id}">${m.name}</button>
+                      <span class="staff-member-state ${stateCls}">${insureStatus}</span>
+                    </div>
+                    <div class="staff-member-meta">与户主关系：${relation}${keyTagText ? ` · 重点对象：${keyTagText}` : ""}</div>
+                    <div class="staff-member-meta">参保类型：${insureType}</div>
+                  </div>`;
+              }).join("")}
+            </div>
+          </div>`;
+        els.archiveBody.querySelectorAll("[data-to-person]").forEach(el => {
+          el.onclick = () => openArchive("person", el.dataset.toPerson);
+        });
+        const archiveHousePhoneToggle = document.getElementById("archiveHousePhoneToggle");
+        const archiveHousePhoneValue = document.getElementById("archiveHousePhoneValue");
+        if (archiveHousePhoneToggle && archiveHousePhoneValue) {
+          archiveHousePhoneToggle.onchange = () => {
+            state.showFullPhone = !!archiveHousePhoneToggle.checked;
+            archiveHousePhoneValue.textContent = maskPhone(householder.phone || r.phone);
+          };
+        }
+        els.archiveBody.querySelectorAll("[data-to-building]").forEach(el => {
+          el.onclick = () => openArchive("building", el.dataset.toBuilding, { addressKind: el.dataset.addressKind || "live" });
+        });
+      }
+
+      if (kind === "building" || kind === "buildingByEnterprise") {
+        let buildingKey = "";
+        let place = "";
+        let sourceText = "";
+        let members = [];
+        if (kind === "building") {
+          const r = byId(residents, id);
+          if (!r) return;
+          const addressKind = opts.addressKind === "hukou" ? "hukou" : "live";
+          const parsed = parsedResidentAddr(r, addressKind);
+          if (!parsed) return;
+          buildingKey = parsed.buildingKey;
+          place = r.place;
+          sourceText = addressKind === "hukou" ? "按户籍地址归集" : "按居住地址归集";
+          members = residents
+            .map(x => ({ person: x, parsed: parsedResidentAddr(x, addressKind) }))
+            .filter(x => x.parsed && x.parsed.buildingKey === buildingKey)
+            .map(x => ({ ...x.person, _parsedAddr: x.parsed }));
+        } else {
+          const e = byId(enterprises, id);
+          if (!e) return;
+          const parsed = parseStdAddress(e.regAddress);
+          if (!parsed) return;
+          buildingKey = parsed.buildingKey;
+          place = e.place;
+          sourceText = "按企业注册地址归集：同楼企业职工 + 同楼居民";
+          const enterprisesOnBuilding = enterprises
+            .map(x => ({ ent: x, parsed: parseStdAddress(x.regAddress) }))
+            .filter(x => x.parsed && x.parsed.buildingKey === buildingKey);
+          const enterpriseIdSet = new Set(enterprisesOnBuilding.map(x => x.ent.id));
+          const enterpriseParsedMap = new Map(enterprisesOnBuilding.map(x => [x.ent.id, x.parsed]));
+
+          const liveMembers = residents
+            .map(x => ({ person: x, parsed: parsedResidentAddr(x, "live") }))
+            .filter(x => x.parsed && x.parsed.buildingKey === buildingKey)
+            .map(x => ({ ...x.person, _parsedAddr: x.parsed, _memberSource: "live" }));
+
+          const staffMembers = residents
+            .filter(x => enterpriseIdSet.has(x.employerId))
+            .map(x => ({
+              ...x,
+              _parsedAddr: enterpriseParsedMap.get(x.employerId) || parsedResidentAddr(x, "live"),
+              _memberSource: "staff"
+            }))
+            .filter(x => !!x._parsedAddr);
+
+          const memberMap = new Map();
+          liveMembers.forEach(x => memberMap.set(x.id, x));
+          staffMembers.forEach(x => {
+            if (!memberMap.has(x.id)) {
+              memberMap.set(x.id, x);
+              return;
+            }
+            const existed = memberMap.get(x.id);
+            memberMap.set(x.id, {
+              ...existed,
+              _memberSource: existed._memberSource === "live" ? "mixed" : existed._memberSource,
+              _parsedAddr: existed._parsedAddr || x._parsedAddr
+            });
+          });
+          members = [...memberMap.values()];
+        }
+        const byFloor = {};
+        members.forEach(m => {
+          const floorNo = m._parsedAddr ? m._parsedAddr.floorNo : 1;
+          const roomKey = m._parsedAddr ? m._parsedAddr.roomKey : "1层01室";
+          const fk = `F${floorNo}`;
+          byFloor[fk] = byFloor[fk] || {};
+          byFloor[fk][roomKey] = byFloor[fk][roomKey] || [];
+          byFloor[fk][roomKey].push(m);
+        });
+        els.archiveTitle.textContent = buildingKey;
+        const insured = members.filter(x => x.thisYearPaid).length;
+        const insuredRate = ratio(insured, Math.max(members.length, 1));
+        const roomKeys = members.map(x => (x._parsedAddr ? x._parsedAddr.roomKey : ""));
+        const rooms = [...new Set(roomKeys.filter(Boolean))];
+        const floorCount = Object.keys(byFloor).length;
+        const areaType = getBuildingAreaType(buildingKey);
+        const managementArea = getManagementAreaFromBuildingKey(buildingKey);
+        const hasNewborn = members.some(x => x.keyGroup === "新生儿" || (x.age || 0) <= 1);
+        const hasHardship = members.some(x => x.keyGroup === "资助对象" || !!x.hardshipType);
+        const buildingStatus = insured === members.length ? "全员参保" : (insured === 0 ? "无人参保" : "部分参保");
+        els.archiveSub.innerHTML = [
+          areaType,
+          insured === 0 ? `<span class="danger-text">无人参保</span>` : buildingStatus,
+          hasNewborn ? renderFocusTag("新生儿") : "",
+          hasHardship ? renderFocusTag("资助对象") : ""
+        ].filter(Boolean).join(" / ");
+        els.archiveBody.innerHTML = `
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("shield")}<span>参保情况</span></div>
+              <span class="stat-time">统计时间：${state.insuranceYear}年度</span>
+            </div>
+            <div class="person-insure-grid">
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>楼栋总人数</span></div>
+                <div class="person-insure-value">${unitText(members.length, "人")}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>已参保人数</span></div>
+                <div class="person-insure-value">${unitText(insured, "人")}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>楼栋参保率</span></div>
+                <div class="person-insure-value">${insuredRate}%</div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("user")}<span>基本信息</span></div>
+            </div>
+            <div class="basic-info-list">
+              <div class="basic-info-item">
+                ${archiveIcon("home")}
+                <div><div class="k">楼栋楼层数</div><div class="v">${unitText(floorCount, "层")}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("card")}
+                <div><div class="k">楼栋房屋数</div><div class="v">${unitText(rooms.length, "户")}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("pin")}
+                <div><div class="k">楼栋区域类型</div><div class="v">${areaType}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("map")}
+                <div><div class="k">管理属地</div><div class="v">${managementArea}</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("home")}<span>楼栋参保情况</span></div>
+            ${Object.keys(byFloor).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))).map(fk => {
+              const floorRoomMap = byFloor[fk];
+              const floorMembers = Object.values(floorRoomMap).flat();
+              return `<div class="archive-section" style="margin-top:8px">
+                <div class="h">${fk.slice(1)}层（${unitText(floorMembers.length, "人")}）</div>
+                ${Object.keys(floorRoomMap).sort((a, b) => {
+                  const pa = parseStdAddress(`${buildingKey}${a}`) || { roomNo: 0 };
+                  const pb = parseStdAddress(`${buildingKey}${b}`) || { roomNo: 0 };
+                  return pa.roomNo - pb.roomNo;
+                }).map(roomKey => {
+                  const list = floorRoomMap[roomKey];
+                  const paid = list.filter(x => x.thisYearPaid).length;
+                  return `<div class="room-card" data-room="${fk}-${roomKey}">
+                    <div class="room-head">
+                      <button class="link-btn archive-open">房屋 ${roomKey}</button>
+                      <span class="mini">${unitText(list.length, "人")} · 已参保${unitText(paid, "人")}</span>
+                    </div>
+                    <div class="room-detail">
+                      <div class="mini">同屋参保汇总：参保率 ${ratio(paid, Math.max(list.length, 1))}%</div>
+                      <div class="archive-lines" style="margin-top:4px">
+                        ${list.map(p => {
+                          const isNewborn = p.keyGroup === "新生儿" || (p.age || 0) <= 1;
+                          const isHardship = p.keyGroup === "资助对象" || !!p.hardshipType;
+                          const insureText = formatInsuranceDisplay(p.thisYearType, p.thisYearPaid);
+                          const newbornTag = isNewborn ? ` · ${renderFocusTag("新生儿", "tag")}` : "";
+                          const hardshipTag = isHardship ? ` · ${renderFocusTag("资助对象", "tag")}` : "";
+                          return `<div class="archive-line">
+                            <button class="link-btn archive-open" data-to-person="${p.id}">${p.name}</button>
+                            <span>${insureText}${newbornTag}${hardshipTag}</span>
+                          </div>`;
+                        }).join("")}
+                      </div>
+                    </div>
+                  </div>`;
+                }).join("")}
+              </div>`;
+            }).join("")}
+          </div>`;
+        els.archiveBody.querySelectorAll("[data-room]").forEach(el => {
+          el.onclick = () => el.classList.toggle("open");
+        });
+        els.archiveBody.querySelectorAll("[data-to-person]").forEach(el => {
+          el.onclick = (e) => {
+            e.stopPropagation();
+            openArchive("person", el.dataset.toPerson);
+          };
+        });
+      }
+      els.archiveModal.classList.add("show");
+      document.body.classList.add("page-lock");
+    }
+    function closeArchive() {
+      els.archiveModal.classList.remove("show");
+      if (!els.drawer.classList.contains("show")) document.body.classList.remove("page-lock");
+    }
+
+    function closeDrawer() {
+      closeArchive();
+      els.drawer.classList.remove("show");
+      els.condPanel.classList.remove("show");
+      document.body.classList.remove("page-lock");
     }
     function syncRoleChips() {}
     function syncLevelChips() {}
@@ -2747,6 +4106,7 @@
     }
 
     document.getElementById("drawerClose").onclick = closeDrawer;
+    document.getElementById("archiveClose").onclick = closeArchive;
     document.getElementById("backLoginBtn").onclick = () => { location.href = "./login.html"; };
     els.overlay.onclick = closeDrawer;
     els.levelSelect.onchange = () => { state.level = els.levelSelect.value; render(); };
