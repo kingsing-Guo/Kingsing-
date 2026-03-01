@@ -16,8 +16,19 @@ let store = {
         intro: '暂无项目简介说明。'
     },
     modules: [],
-    weeklyReports: []
+    weeklyReports: [],
+    parsedTree: null
 };
+
+// ================= Parsed Tree =================
+app.get('/api/parsed-tree', (req, res) => {
+    res.json({ ok: true, data: store.parsedTree });
+});
+
+app.post('/api/parsed-tree', (req, res) => {
+    store.parsedTree = req.body.tree;
+    res.json({ ok: true });
+});
 
 // ================= Project Info =================
 app.get('/api/project-info', (req, res) => {
@@ -80,6 +91,16 @@ app.put('/api/modules/:id', (req, res) => {
         store.modules[index] = { ...store.modules[index], ...updateData };
     }
 
+    res.json({ ok: true });
+});
+
+app.patch('/api/modules/:id', (req, res) => {
+    const id = req.params.id;
+    const data = req.body;
+    const index = store.modules.findIndex(m => m.id === id);
+    if (index !== -1) {
+        store.modules[index] = { ...store.modules[index], ...data };
+    }
     res.json({ ok: true });
 });
 
