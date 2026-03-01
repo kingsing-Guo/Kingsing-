@@ -1,0 +1,24 @@
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 9 modules transformed.
+✗ Build failed in 241ms
+error during build:
+src/App.tsx (30:14): Identifier "appId" has already been declared
+file: /Users/tonibao_1/Documents/New project/项目协同管理/pm-dashboard-v2/src/App.tsx:30:14
+
+28: 
+29:         const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
+30:         const appId = window.__app_id || 'credit-board-cloud-v3';
+                  ^
+31:         const initialToken = window.__initial_auth_token || '';
+
+    at getRollupError (file:///Users/tonibao_1/Documents/New%20project/%E9%A1%B9%E7%9B%AE%E5%8D%8F%E5%90%8C%E7%AE%A1%E7%90%86/pm-dashboard-v2/node_modules/rollup/dist/es/shared/parseAst.js:402:41)
+    at error (file:///Users/tonibao_1/Documents/New%20project/%E9%A1%B9%E7%9B%AE%E5%8D%8F%E5%90%8C%E7%AE%A1%E7%90%86/pm-dashboard-v2/node_modules/rollup/dist/es/shared/parseAst.js:398:42)
+    at Module.error (file:///Users/tonibao_1/Documents/New%20project/%E9%A1%B9%E7%9B%AE%E5%8D%8F%E5%90%8C%E7%AE%A1%E7%90%86/pm-dashboard-v2/node_modules/rollup/dist/es/shared/node-entry.js:17040:16)
+    at ModuleScope.addDeclaration (file:///Users/tonibao_1/Documents/New%20project/%E9%A1%B9%E7%9B%AE%E5%8D%8F%E5%90%8C%E7%AE%A1%E7%90%86/pm-dashboard-v2/node_modules/rollup/dist/es/shared/node-entry.js:15047:21)
+    at Identifier.declare (file:///Users/tonibao_1/Documents/New%20project/%E9%A1%B9%E7%9B%AE%E5%8D%8F%E5%90%8C%E7%AE%A1%E7%90%86/pm-dashboard-v2/node_modules/rollup/dist/es/shared/node-entry.js:5459:35)
+    at VariableDeclarator.declareDeclarator (file:///Users/tonibao_1/Documents/New%20project/%E9%A1%B9%E7%9B%AE%E5%8D%8F%E5%90%8C%E7%AE%A1%E7%90%86/pm-dashboard-v2/node_modules/rollup/dist/es/shared/node-entry.js:15551:17)
+    at VariableDeclaration.initialise (file:///Users/tonibao_1/Documents/New%20project/%E9%A1%B9%E7%9B%AE%E5%8D%8F%E5%90%8C%E7%AE%A1%E7%90%86/pm-dashboard-v2/node_modules/rollup/dist/es/shared/node-entry.js:15392:24)
+    at convertNode (file:///Users/tonibao_1/Documents/New%20project/%E9%A1%B9%E7%9B%AE%E5%8D%8F%E5%90%8C%E7%AE%A1%E7%90%86/pm-dashboard-v2/node_modules/rollup/dist/es/shared/node-entry.js:16437:10)
+    at convertNodeList (file:///Users/tonibao_1/Documents/New%20project/%E9%A1%B9%E7%9B%AE%E5%8D%8F%E5%90%8C%E7%AE%A1%E7%90%86/pm-dashboard-v2/node_modules/rollup/dist/es/shared/node-entry.js:16447:38)
+    at Array.program (file:///Users/tonibao_1/Documents/New%20project/%E9%A1%B9%E7%9B%AE%E5%8D%8F%E5%90%8C%E7%AE%A1%E7%90%86/pm-dashboard-v2/node_modules/rollup/dist/es/shared/node-entry.js:16297:21)
