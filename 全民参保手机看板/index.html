@@ -1636,6 +1636,110 @@
       if (["前进路", "天兴路", "团结路"].includes(road)) return "生活小区";
       return "其他";
     }
+    const CONFIRMED_LOSS_TYPES = new Set(["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"]);
+    function isConfirmedLossResident(r) {
+      return CONFIRMED_LOSS_TYPES.has(r.stockChangeType) || CONFIRMED_LOSS_TYPES.has(r.lossReason);
+    }
+    function isStockMobilizableResident(r) {
+      return !!r.lastYearLocalPaid && !r.thisYearPaid && r.stockChangeType === "可动员" && !isConfirmedLossResident(r);
+    }
+    function isIncrementPotentialResident(r) {
+      return (
+        !r.thisYearPaid &&
+        !isConfirmedLossResident(r) &&
+        ((!r.lastYearPaid) || (r.lastYearPaid && !r.lastYearLocalPaid)) &&
+        (r.household === "本区户籍" || r.residence === "本区居住")
+      );
+    }
+    function normalizeResidentRecord(r, seed = 1) {
+      const age = Number(r.age || 0);
+      const paid = !!r.thisYearPaid;
+      let thisYearPaid = paid;
+      let thisYearType = r.thisYearType || (thisYearPaid ? "居民保" : "未参保");
+      let insuredPlace = r.insuredPlace || "";
+      let stockChangeType = r.stockChangeType || "";
+      let lossReason = r.lossReason || "";
+      const hardship = !!r.isHardship || !!r.hardshipType || r.keyGroup === "资助对象";
+
+      if (!thisYearPaid) {
+        thisYearType = "未参保";
+        insuredPlace = "";
+      } else if (!["居民保", "职工保"].includes(thisYearType)) {
+        thisYearType = "居民保";
+      }
+      if (age < 18 && thisYearType === "职工保") {
+        thisYearType = thisYearPaid ? "居民保" : "未参保";
+        r.staffBigType = "";
+        r.staffDetailType = "";
+      }
+
+      if (CONFIRMED_LOSS_TYPES.has(stockChangeType)) lossReason = stockChangeType;
+      if (!stockChangeType && CONFIRMED_LOSS_TYPES.has(lossReason)) stockChangeType = lossReason;
+
+      if (stockChangeType === "可动员") {
+        thisYearPaid = false;
+        thisYearType = "未参保";
+        insuredPlace = "";
+        lossReason = "";
+      } else if (stockChangeType === "死亡" || stockChangeType === "停保") {
+        thisYearPaid = false;
+        thisYearType = "未参保";
+        insuredPlace = "";
+      } else if (stockChangeType === "转职工保（含灵活就业参保）") {
+        thisYearPaid = true;
+        thisYearType = "职工保";
+      } else if (stockChangeType === "存量续保") {
+        thisYearPaid = true;
+        thisYearType = "居民保";
+        insuredPlace = insuredPlace || "本区县参保";
+      }
+
+      if (!r.lastYearLocalPaid && ["可动员", "存量续保"].includes(stockChangeType)) {
+        stockChangeType = "";
+        lossReason = "";
+      }
+      if (thisYearPaid && !insuredPlace) insuredPlace = "本区县参保";
+      if (thisYearPaid && r.pauseFlow) r.pauseFlow = "";
+
+      let keyGroup = "无";
+      if (age <= 1) keyGroup = "新生儿";
+      else if (age >= 6 && age <= 18 && (r.keyGroup === "中小学生" || !!r.isPrimarySecondary)) keyGroup = "中小学生";
+      else if (age >= 16 && age <= 30 && (r.keyGroup === "高校生" || !!r.isCollege)) keyGroup = "高校生";
+      else if (hardship) keyGroup = "资助对象";
+
+      r.age = age;
+      r.ageGroup = age <= 16 ? "16岁及以下" : age <= 30 ? "16-30岁" : age <= 45 ? "31-45岁" : age <= 60 ? "46-60岁" : "60岁以上";
+      r.thisYearPaid = thisYearPaid;
+      r.thisYearType = thisYearType;
+      r.insuredPlace = insuredPlace;
+      r.stockChangeType = stockChangeType;
+      r.lossReason = lossReason;
+      r.keyGroup = keyGroup;
+      r.isPrimarySecondary = keyGroup === "中小学生";
+      r.isCollege = keyGroup === "高校生";
+      r.isHardship = hardship || keyGroup === "资助对象";
+      if (r.isHardship && !r.hardshipType) {
+        r.hardshipType = ["低保对象", "残疾对象", "特困对象"][Math.abs(seed) % 3];
+      }
+      if (!r.isHardship) r.hardshipType = "";
+      if (thisYearType !== "职工保") {
+        r.staffBigType = "";
+        r.staffDetailType = "";
+      }
+      r.reason = stockChangeType === "可动员" ? "存量未参保（可动员）" : (stockChangeType || (!thisYearPaid ? "未参保" : "已参保"));
+      return r;
+    }
+    function normalizeAllResidentDataSets() {
+      let seed = 7;
+      (data.streets || []).forEach(s => {
+        (s.villages || []).forEach(v => {
+          (v.residents || []).forEach(r => {
+            seed += 17;
+            normalizeResidentRecord(r, seed);
+          });
+        });
+      });
+    }
     function runRelationAudit() {
       const villages = data.streets.flatMap(s => s.villages || []);
       const issues = [];
@@ -1678,6 +1782,14 @@
             issues.push(`[楼栋归集异常] ${v.name} ${e.name} staff=${staffCnt} building=${bk}`);
           }
         });
+        // 3) 逻辑口径快速校验
+        rs.forEach(r => {
+          if (r.keyGroup === "新生儿" && (r.age || 0) > 1) issues.push(`[年龄冲突] ${v.name} ${r.name} 新生儿 age=${r.age}`);
+          if (r.keyGroup === "中小学生" && !((r.age || 0) >= 6 && (r.age || 0) <= 18)) issues.push(`[年龄冲突] ${v.name} ${r.name} 中小学生 age=${r.age}`);
+          if (r.keyGroup === "高校生" && !((r.age || 0) >= 16 && (r.age || 0) <= 30)) issues.push(`[年龄冲突] ${v.name} ${r.name} 高校生 age=${r.age}`);
+          if ((r.age || 0) < 18 && r.thisYearType === "职工保") issues.push(`[年龄冲突] ${v.name} ${r.name} 未满18岁却职工保`);
+          if (isConfirmedLossResident(r) && isStockMobilizableResident(r)) issues.push(`[可动员冲突] ${v.name} ${r.name} 已确认减员却仍可动员`);
+        });
       });
       if (issues.length) {
         console.warn(`[关系校验] 发现 ${issues.length} 个问题`, issues.slice(0, 20));
@@ -1685,6 +1797,7 @@
         console.info("[关系校验] 通过：人/户/企/楼关联一致。");
       }
     }
+    normalizeAllResidentDataSets();
     runRelationAudit();
 
     function mkVillage(streetName, name, target, current) {
@@ -1952,6 +2065,8 @@
       if (!json.ok || !json.dashboard || !Array.isArray(json.dashboard.streets)) return false;
       data.district = json.dashboard.district || data.district;
       data.streets = json.dashboard.streets;
+      normalizeAllResidentDataSets();
+      runRelationAudit();
       if (json.profile && json.profile.identity && identityProfiles[json.profile.identity]) {
         state.identity = json.profile.identity;
         state.role = (json.profile.roles || ["leader"])[0];
@@ -2163,8 +2278,8 @@
       const gapResident = metrics.gapResident;
       const gapTotal = metrics.gapTotal;
       const gapDecreaseDay = gapTotal === 0 ? 0 : Math.max(1, Math.round(gapTotal * 0.08));
-      const mobilizeStock = node.residents.filter(r => r.lastYearPaid && !r.thisYearPaid).length;
-      const mobilizeIncrement = node.residents.filter(r => !r.lastYearPaid && r.household === "本区户籍" && r.residence === "本区居住" && !r.thisYearPaid).length;
+      const mobilizeStock = node.residents.filter(r => isStockMobilizableResident(r)).length;
+      const mobilizeIncrement = node.residents.filter(r => isIncrementPotentialResident(r) && r.household === "本区户籍").length;
       const mobilizeTotal = mobilizeStock + mobilizeIncrement;
       const gapTip = mobilizeTotal >= gapResident
         ? `机会评估：可动员${unitText(mobilizeTotal, "人")}，高于居民保差距${unitText(gapResident, "人")}，任务仍有完成机会。`
@@ -2705,12 +2820,8 @@
       const yesterdayAdded = Math.max(0, Math.round(residentDone * 0.012));
       const updateAt = new Date().toLocaleString("zh-CN", { hour12: false });
 
-      const stockUnpaidList = node.residents.filter(r => r.lastYearLocalPaid && r.stockChangeType === "可动员");
-      const incrementPotentialList = node.residents.filter(r =>
-        !r.thisYearPaid &&
-        ((!r.lastYearPaid) || (r.lastYearPaid && !r.lastYearLocalPaid)) &&
-        (r.household === "本区户籍" || r.residence === "本区居住")
-      );
+      const stockUnpaidList = node.residents.filter(r => isStockMobilizableResident(r));
+      const incrementPotentialList = node.residents.filter(r => isIncrementPotentialResident(r));
       const mobilizableCount = stockUnpaidList.length + incrementPotentialList.length;
       const workerWarn = mobilizableCount < diff;
 
@@ -2724,10 +2835,7 @@
       const stockRel = byRel(stockUnpaidList);
       const incRel = byRel(incrementPotentialList);
 
-      const hardshipPending = node.residents.filter(r =>
-        r.isHardship && !r.thisYearPaid &&
-        ((r.lastYearLocalPaid && r.stockChangeType === "可动员") || (((!r.lastYearPaid) || (r.lastYearPaid && !r.lastYearLocalPaid)) && (r.household === "本区户籍" || r.residence === "本区居住")))
-      );
+      const hardshipPending = node.residents.filter(r => r.isHardship && (isStockMobilizableResident(r) || isIncrementPotentialResident(r)));
       const hardshipTypeList = ["低保对象", "残疾对象", "特困对象"].map(t => ({
         type: t,
         count: hardshipPending.filter(r => r.hardshipType === t).length
@@ -2856,52 +2964,37 @@
         staff_unit_insured: x => x.type === "企业" && x.staffInsured,
         staff_unit_uninsured: x => x.type === "企业" && !x.staffInsured,
         worker_done_resident: x => x.type === "居民" && x.thisYearType === "居民保" && x.thisYearPaid,
-        worker_stock_unpaid: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "可动员",
-        worker_increment_potential: x => x.type === "居民" && !x.thisYearPaid && ((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && (x.household === "本区户籍" || x.residence === "本区居住"),
-        worker_mobilizable: x => x.type === "居民" && (
-          (x.lastYearLocalPaid && x.stockChangeType === "可动员") ||
-          (!x.thisYearPaid && ((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && (x.household === "本区户籍" || x.residence === "本区居住"))
-        ),
-        stock_hh_local_res_local: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "可动员" && x.household === "本区户籍" && x.residence === "本区居住",
-        stock_hh_local_res_other: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "可动员" && x.household === "本区户籍" && x.residence !== "本区居住",
-        stock_hh_other_res_local: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "可动员" && x.household !== "本区户籍" && x.residence === "本区居住",
-        stock_hh_other_res_other: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "可动员" && x.household !== "本区户籍" && x.residence !== "本区居住",
-        inc_hh_local_res_local: x => x.type === "居民" && !x.thisYearPaid && ((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && x.household === "本区户籍" && x.residence === "本区居住",
-        inc_hh_local_res_other: x => x.type === "居民" && !x.thisYearPaid && ((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && x.household === "本区户籍" && x.residence !== "本区居住",
-        inc_hh_other_res_local: x => x.type === "居民" && !x.thisYearPaid && ((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && x.household !== "本区户籍" && x.residence === "本区居住",
-        hardship_pending_total: x => x.type === "居民" && x.isHardship && !x.thisYearPaid && (
-          (x.lastYearLocalPaid && x.stockChangeType === "可动员") ||
-          (((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && (x.household === "本区户籍" || x.residence === "本区居住"))
-        ),
-        hardship_type_低保对象: x => x.type === "居民" && x.isHardship && x.hardshipType === "低保对象" && !x.thisYearPaid && (
-          (x.lastYearLocalPaid && x.stockChangeType === "可动员") ||
-          (((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && (x.household === "本区户籍" || x.residence === "本区居住"))
-        ),
-        hardship_type_残疾对象: x => x.type === "居民" && x.isHardship && x.hardshipType === "残疾对象" && !x.thisYearPaid && (
-          (x.lastYearLocalPaid && x.stockChangeType === "可动员") ||
-          (((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && (x.household === "本区户籍" || x.residence === "本区居住"))
-        ),
-        hardship_type_特困对象: x => x.type === "居民" && x.isHardship && x.hardshipType === "特困对象" && !x.thisYearPaid && (
-          (x.lastYearLocalPaid && x.stockChangeType === "可动员") ||
-          (((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && (x.household === "本区户籍" || x.residence === "本区居住"))
-        ),
+        worker_stock_unpaid: x => x.type === "居民" && isStockMobilizableResident(x),
+        worker_increment_potential: x => x.type === "居民" && isIncrementPotentialResident(x),
+        worker_mobilizable: x => x.type === "居民" && (isStockMobilizableResident(x) || isIncrementPotentialResident(x)),
+        stock_hh_local_res_local: x => x.type === "居民" && isStockMobilizableResident(x) && x.household === "本区户籍" && x.residence === "本区居住",
+        stock_hh_local_res_other: x => x.type === "居民" && isStockMobilizableResident(x) && x.household === "本区户籍" && x.residence !== "本区居住",
+        stock_hh_other_res_local: x => x.type === "居民" && isStockMobilizableResident(x) && x.household !== "本区户籍" && x.residence === "本区居住",
+        stock_hh_other_res_other: x => x.type === "居民" && isStockMobilizableResident(x) && x.household !== "本区户籍" && x.residence !== "本区居住",
+        inc_hh_local_res_local: x => x.type === "居民" && isIncrementPotentialResident(x) && x.household === "本区户籍" && x.residence === "本区居住",
+        inc_hh_local_res_other: x => x.type === "居民" && isIncrementPotentialResident(x) && x.household === "本区户籍" && x.residence !== "本区居住",
+        inc_hh_other_res_local: x => x.type === "居民" && isIncrementPotentialResident(x) && x.household !== "本区户籍" && x.residence === "本区居住",
+        hardship_pending_total: x => x.type === "居民" && x.isHardship && (isStockMobilizableResident(x) || isIncrementPotentialResident(x)),
+        hardship_type_低保对象: x => x.type === "居民" && x.isHardship && x.hardshipType === "低保对象" && (isStockMobilizableResident(x) || isIncrementPotentialResident(x)),
+        hardship_type_残疾对象: x => x.type === "居民" && x.isHardship && x.hardshipType === "残疾对象" && (isStockMobilizableResident(x) || isIncrementPotentialResident(x)),
+        hardship_type_特困对象: x => x.type === "居民" && x.isHardship && x.hardshipType === "特困对象" && (isStockMobilizableResident(x) || isIncrementPotentialResident(x)),
         resident_stock_done: x => x.type === "居民" && x.lastYearPaid && x.thisYearPaid,
         resident_increment_done: x => x.type === "居民" && !x.lastYearPaid && x.thisYearPaid,
         gap_staff: x => x.type === "企业" && x.risk !== "低",
         gap_resident: x => x.type === "居民" && !x.thisYearPaid,
-        mobilize_total: x => x.type === "居民" && !x.thisYearPaid && (x.lastYearPaid || (x.household === "本区户籍" && x.residence === "本区居住")),
-        mobilize_stock: x => x.type === "居民" && x.lastYearPaid && !x.thisYearPaid,
-        mobilize_increment: x => x.type === "居民" && !x.lastYearPaid && x.household === "本区户籍" && x.residence === "本区居住" && !x.thisYearPaid,
+        mobilize_total: x => x.type === "居民" && (isStockMobilizableResident(x) || (isIncrementPotentialResident(x) && x.household === "本区户籍")),
+        mobilize_stock: x => x.type === "居民" && isStockMobilizableResident(x),
+        mobilize_increment: x => x.type === "居民" && isIncrementPotentialResident(x) && x.household === "本区户籍",
         need_mobilize: x => x.type === "居民" ? !x.thisYearPaid : x.risk !== "低",
         progress: x => x.type === "居民",
         stock_total: x => x.type === "居民" && x.lastYearLocalPaid,
         stock_insured: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "存量续保",
         stock_retained: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "存量续保",
         stock_loss: x => x.type === "居民" && x.lastYearLocalPaid && ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"].includes(x.stockChangeType),
-        stock_unpaid: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "可动员",
-        stock_uninsured: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "可动员",
+        stock_unpaid: x => x.type === "居民" && isStockMobilizableResident(x),
+        stock_uninsured: x => x.type === "居民" && isStockMobilizableResident(x),
         increment_new: x => x.type === "居民" && ((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && x.thisYearPaid && x.insuredPlace === "本区县参保",
-        increment_potential: x => x.type === "居民" && x.household === "本区户籍" && !x.thisYearPaid && ((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)),
+        increment_potential: x => x.type === "居民" && x.household === "本区户籍" && isIncrementPotentialResident(x),
         gender_male: x => x.type === "居民" && x.gender === "男",
         gender_female: x => x.type === "居民" && x.gender === "女",
         local_local: x => x.type === "居民" && x.household === "本区户籍" && x.residence === "本区居住",

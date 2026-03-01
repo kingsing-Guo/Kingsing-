@@ -54,7 +54,6 @@ def mask_addr(base, i):
 def seed_residents(conn, year=2026):
     random.seed(20260222)
     villages = ["V001", "V002", "V003", "V004"]
-    key_groups = ["新生儿", "中小学生", "高校生", "资助对象", ""]
     hardship_types = ["低保对象", "残疾对象", "特困对象", ""]
     staff_details = ["在职职工", "单位退休人员", "灵活就业（一档）", "灵活就业（二档）", "个人退休（一档）", "个人退休（二档）"]
 
@@ -65,8 +64,8 @@ def seed_residents(conn, year=2026):
         age = random.randint(0, 80)
         gender = "男" if i % 2 == 0 else "女"
         household = "本区户籍" if i % 3 != 0 else "非本区户籍"
-        residence = "本区居住" if i % 4 != 0 else "外区居住"
         residence_detail = ["本辖区", "区内其他辖区", "市内外区", "市外"][i % 4]
+        residence = "本区居住" if residence_detail in ["本辖区", "区内其他辖区"] else "外区居住"
 
         this_year_paid = 1 if random.random() < 0.78 else 0
         this_year_type = "职工保" if (this_year_paid and age >= 18 and random.random() < 0.43) else ("居民保" if this_year_paid else "未参保")
@@ -86,13 +85,24 @@ def seed_residents(conn, year=2026):
             stock_change_type = random.choice(["可动员", "停保", "死亡", "辖区外参保", "转职工保（含灵活就业参保）"])
         elif last_year_local_paid == 1 and this_year_type == "职工保":
             stock_change_type = "转职工保（含灵活就业参保）"
+        elif last_year_local_paid == 1 and this_year_paid == 1 and this_year_type == "居民保" and insured_place != "本区县参保":
+            stock_change_type = "辖区外参保"
         else:
-            stock_change_type = "可动员" if this_year_paid == 0 else "存量续保"
+            stock_change_type = ""
+
+        if stock_change_type in ["死亡", "停保", "可动员"]:
+            this_year_paid = 0
+            this_year_type = "未参保"
+            insured_place = ""
+        elif stock_change_type == "转职工保（含灵活就业参保）":
+            this_year_paid = 1
+            this_year_type = "职工保"
+            insured_place = insured_place or "本区县参保"
 
         loss_reason = stock_change_type if stock_change_type in ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"] else ""
         pause_flow = random.choice(["转居民保", "申请停保", "跨区转出", ""]) if this_year_paid == 0 else ""
 
-        key_group = key_groups[i % len(key_groups)]
+        key_group = ""
         if age <= 1:
             key_group = "新生儿"
         elif 6 <= age <= 18 and random.random() < 0.7:
@@ -100,7 +110,9 @@ def seed_residents(conn, year=2026):
         elif 16 <= age <= 30 and random.random() < 0.5:
             key_group = "高校生"
 
-        is_hardship = 1 if key_group == "资助对象" or random.random() < 0.14 else 0
+        is_hardship = 1 if random.random() < 0.14 else 0
+        if key_group == "" and is_hardship == 1:
+            key_group = "资助对象"
         hardship_type = hardship_types[i % len(hardship_types)] if is_hardship else ""
 
         staff_big_type = ""
@@ -108,6 +120,17 @@ def seed_residents(conn, year=2026):
         if this_year_type == "职工保":
             staff_big_type = "单位参保" if random.random() < 0.46 else "个人参保（灵活就业）"
             staff_detail_type = random.choice(staff_details)
+
+        if age < 18 and this_year_type == "职工保":
+            this_year_type = "居民保" if this_year_paid == 1 else "未参保"
+            staff_big_type = ""
+            staff_detail_type = ""
+            if stock_change_type == "转职工保（含灵活就业参保）":
+                if last_year_local_paid == 1:
+                    stock_change_type = "存量续保" if (this_year_paid == 1 and insured_place == "本区县参保") else ("辖区外参保" if this_year_paid == 1 else "可动员")
+                else:
+                    stock_change_type = ""
+                loss_reason = stock_change_type if stock_change_type in ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"] else ""
 
         rows.append(
             (

@@ -46,6 +46,7 @@ def _fetch_enterprises(conn, unit_ids, year):
 
 
 def compute_core_metrics(residents):
+    confirmed_losses = {"死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"}
     total_pop = len(residents)
     done_total = sum(1 for r in residents if r["this_year_paid"] == 1)
     done_staff = sum(1 for r in residents if r["this_year_paid"] == 1 and r["this_year_type"] == "职工保")
@@ -59,12 +60,21 @@ def compute_core_metrics(residents):
     gap_staff = max(target_staff - done_staff, 0)
     gap_resident = max(target_resident - done_resident, 0)
 
-    stock_mobilizable = sum(1 for r in residents if r["stock_change_type"] == "可动员")
+    stock_mobilizable = sum(
+        1
+        for r in residents
+        if r["stock_change_type"] == "可动员"
+        and r["this_year_paid"] == 0
+        and r["stock_change_type"] not in confirmed_losses
+        and r["loss_reason"] not in confirmed_losses
+    )
     increment_mobilizable = sum(
         1
         for r in residents
         if r["this_year_paid"] == 0
         and r["last_year_local_paid"] == 0
+        and r["stock_change_type"] not in confirmed_losses
+        and r["loss_reason"] not in confirmed_losses
         and (r["household"] == "本区户籍" or r["residence"] == "本区居住")
     )
     mobilizable_total = stock_mobilizable + increment_mobilizable
