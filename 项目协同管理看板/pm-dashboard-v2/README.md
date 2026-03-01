@@ -1,73 +1,84 @@
-# React + TypeScript + Vite
+# 项目协同管理看板 (PM Dashboard v2)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+这是一套专为复杂项目模块化管理的协同看板系统，集成了**项目进展监控**、**功能架构维护**、**响应策略管理**以及**双引擎数据驱动**。
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 核心特性
 
-## React Compiler
+1.  **项目建设详情看板**：实时监控子系统与模块的完成进度、风险延误及协调事项。
+2.  **功能模块架构管理**：支持从 Excel 智能解析复杂的功能树结构，并同步至看板系统。
+3.  **权限控制体系**：
+    *   **看板页**：管理子系统（L1）与一级功能模块（L2）的立项。
+    *   **架构页**：专注于 L3 功能拆解及更深层级的功能点设计。
+4.  **智能模糊查询**：支持对海量功能模块进行名称/关键字快速检索与定位。
+5.  **双引擎运行机制**：支持“本机演示模式”与“生产数据库模式”的一键切换。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🛠️ 双引擎运行策略 (Dual Engine Strategy)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+为了兼顾“快速演示验证”与“正式生产部署”，系统在后端集成了双存储引擎。
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 1. 演示模式 (Memory Mode) - **默认**
+*   **用途**：用于本机功能验证、临时演示、无网络办公场景。
+*   **配置**：修改 `backend/.env` -> `DB_TYPE=memory`。
+*   **特点**：
+    *   零依赖，无需安装数据库。
+    *   数据存储在服务器内存中，重启服务器后数据会重置。
+    *   适合前端 UI 逻辑的快速修改验证。
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 2. 生产模式 (MySQL Mode)
+*   **用途**：正式环境部署、多人协作、长期数据存储。
+*   **配置**：修改 `backend/.env` -> `DB_TYPE=mysql`。
+*   **配置步骤**：
+    1.  安装 MySQL 数据库。
+    2.  运行 `backend/init.sql` 脚本初始化数据库结构。
+    3.  在 `backend/.env` 中填入你的 MySQL 连接信息（Host, User, Password, Database）。
+*   **特点**：数据永久保存，支持大规模并发访问，性能稳健。
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## 📖 快速上手
+
+### 环境准备
+*   Node.js (v18+)
+*   Git
+
+### 后端服务启动
+```bash
+cd backend
+npm install
+# 根据需要修改 .env 配置文件
+node server.js
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 前端应用启动
+```bash
+cd pm-dashboard-v2
+npm install
+npm run dev
 ```
+
+---
+
+## 📜 数据库结构说明
+如果你选择开启 MySQL 模式，系统主要维护以下表：
+*   `project_info`：项目名称、节点计划、响应策略字典。
+*   `modules`：L1/L2 模块及其关联的 L3 功能架构 JSON 数据。
+*   `weekly_reports`：项目周报附件。
+*   `parsed_tree`：架构维护页的全局缓存树。
+
+---
+
+## 📐 响应策略字典同步
+在“项目基本情况”中定义的任何策略（如：高保真DEMO、产品改造、定制开发），系统会自动在以下场景同步应用：
+*   Excel 导入解析映射。
+*   架构页 L3 节点的响应模式选择。
+*   看板卡片的末端功能点统计分布。
+
+---
+
+## 🤝 协作建议
+*   **修改 UI**：建议在 `memory` 模式下修改，确认无误后再提交。
+*   **线上维护**：务必确认 `.env` 处于 `mysql` 模式，确保数据不丢失。
