@@ -80,6 +80,19 @@ def _normalize_resident_logic(r, seed):
     this_type = r.get("thisYearType") or ("居民保" if paid else "未参保")
     stock = r.get("stockChangeType") or ""
     loss = r.get("lossReason") or ""
+    residence = (r.get("residence") or "").strip()
+    residence_detail = (r.get("residenceDetail") or "").strip()
+
+    # 居住简化维与细分维一致化
+    if residence_detail in {"本辖区", "区内其他辖区"}:
+        residence = "本区居住"
+    elif residence_detail in {"市内外区", "市外"}:
+        residence = "外区居住"
+    else:
+        if residence == "本区居住":
+            residence_detail = "本辖区"
+        elif residence == "外区居住":
+            residence_detail = "市内外区"
 
     # 参保状态与类型一致性
     if not paid:
@@ -187,6 +200,10 @@ def _normalize_resident_logic(r, seed):
     r["hardshipType"] = hardship_type if hardship else ""
     r["stockChangeType"] = stock
     r["lossReason"] = loss
+    if residence:
+        r["residence"] = residence
+    if residence_detail:
+        r["residenceDetail"] = residence_detail
     if paid and r.get("pauseFlow") in {"转居民保", "申请停保", "跨区转出"}:
         r["pauseFlow"] = ""
     return r
