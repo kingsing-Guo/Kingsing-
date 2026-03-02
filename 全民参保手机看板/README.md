@@ -1,13 +1,13 @@
 # 全民参保数智动员手机看板
 
 本仓库包含：
-- 前端看板：`/Users/tonibao_1/Documents/New project/index.html`
-- 登录页：`/Users/tonibao_1/Documents/New project/login.html`
-- 后端起步版：`/Users/tonibao_1/Documents/New project/backend`
+- 前端看板：`/Users/tonibao_1/Documents/New project/全民参保手机看板/index.html`
+- 登录页：`/Users/tonibao_1/Documents/New project/全民参保手机看板/login.html`
+- 后端起步版：`/Users/tonibao_1/Documents/New project/全民参保手机看板/backend`
 
 ## 后端快速启动
 ```bash
-cd "/Users/tonibao_1/Documents/New project/backend"
+cd "/Users/tonibao_1/Documents/New project/全民参保手机看板/backend"
 python3 seed_db.py
 python3 server.py
 ```
@@ -18,7 +18,7 @@ python3 server.py
 - 指标：`/api/metrics/core|age|staff|risk`
 - 列表：`/api/list/residents`、`/api/list/enterprises`
 
-详细见：`/Users/tonibao_1/Documents/New project/backend/README.md`
+详细见：`/Users/tonibao_1/Documents/New project/全民参保手机看板/backend/README.md`
 
 ## 双版本并行开发（推荐流程）
 
@@ -28,25 +28,25 @@ python3 server.py
 
 ### 1) 切换到联通版开发（main）
 ```bash
-cd "/Users/tonibao_1/Documents/New project"
+cd "/Users/tonibao_1/Documents/New project/全民参保手机看板"
 git switch main
 ```
 
 本地启动（联通版）：
 ```bash
 # 终端1
-cd "/Users/tonibao_1/Documents/New project"
+cd "/Users/tonibao_1/Documents/New project/全民参保手机看板"
 python3 backend/seed_db.py
 python3 backend/server.py
 
 # 终端2
-cd "/Users/tonibao_1/Documents/New project"
+cd "/Users/tonibao_1/Documents/New project/全民参保手机看板"
 python3 -m http.server 8080
 ```
 
 ### 2) 切换到纯前端演示版开发（frontend-demo）
 ```bash
-cd "/Users/tonibao_1/Documents/New project"
+cd "/Users/tonibao_1/Documents/New project/全民参保手机看板"
 git switch frontend-demo
 python3 -m http.server 8090
 ```
@@ -78,7 +78,7 @@ git push origin frontend-demo
 
 终端A（联通版后端）：
 ```bash
-cd "/Users/tonibao_1/Documents/New project"
+cd "/Users/tonibao_1/Documents/New project/全民参保手机看板"
 git switch main
 python3 backend/seed_db.py
 python3 backend/server.py
@@ -86,7 +86,7 @@ python3 backend/server.py
 
 终端B（联通版前端）：
 ```bash
-cd "/Users/tonibao_1/Documents/New project"
+cd "/Users/tonibao_1/Documents/New project/全民参保手机看板"
 python3 -m http.server 8080
 ```
 
@@ -105,7 +105,7 @@ python3 -m http.server 8090
 
 ### 一键启动（联通版前后端 + 纯前端版）
 ```bash
-cd "/Users/tonibao_1/Documents/New project" && \
+cd "/Users/tonibao_1/Documents/New project/全民参保手机看板" && \
 python3 backend/seed_db.py && \
 (python3 backend/server.py > /tmp/dashboard_backend.log 2>&1 &) && \
 (python3 -m http.server 8080 > /tmp/dashboard_frontend_main.log 2>&1 &) && \
@@ -128,7 +128,7 @@ pkill -f "backend/server.py"; pkill -f "http.server 8080"; pkill -f "http.server
 
 1) 在纯前端版实现与确认  
 ```bash
-cd "/Users/tonibao_1/Documents/New project"
+cd "/Users/tonibao_1/Documents/New project/全民参保手机看板"
 git switch frontend-demo
 ```
 - 完成 UI/交互改动
