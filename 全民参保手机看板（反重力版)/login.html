@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>看板登录入口</title>
+  <link rel="stylesheet" href="css/login.css" />
+</head>
+<body>
+  <div class="app">
+    <div class="main">
+      <div class="title-row">
+        <div class="title">全民参保数智动员手机看板</div>
+        <div class="ver">V2.0</div>
+      </div>
+      <div class="region">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        重庆市九龙坡区
+      </div>
+      <div class="sub">请选择登录角色后进入看板</div>
+      <div class="grid">
+        <button class="entry district" data-id="district_leader">
+          <div class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3v7"/><path d="M7.5 7.5h9"/><path d="M5 21h14"/><path d="M7 21V11h10v10"/><path d="M10 15h4"/></svg>
+            </span>
+            <div class="info">
+              <div class="n">区医保局领导</div>
+              <div class="u">重庆市九龙坡区医保局</div>
+            </div>
+          </div>
+          <div class="go">进入看板 ›</div>
+        </button>
+        <button class="entry street" data-id="street_leader">
+          <div class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5"/><path d="M6 9.5V20h12V9.5"/><path d="M9 20v-6h6v6"/><path d="M10 8h4"/></svg>
+            </span>
+            <div class="info">
+              <div class="n">镇街分管领导</div>
+              <div class="u">石桥铺街道社保所</div>
+            </div>
+          </div>
+          <div class="go">进入看板 ›</div>
+        </button>
+        <button class="entry village" data-id="village_leader">
+          <div class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M6 20V9l6-4 6 4v11"/><path d="M9 12h6"/><path d="M10 20v-4h4v4"/></svg>
+            </span>
+            <div class="info">
+              <div class="n">村居领导</div>
+              <div class="u">渝州路社区居委会</div>
+            </div>
+          </div>
+          <div class="go">进入看板 ›</div>
+        </button>
+        <button class="entry gridder" data-id="grid_worker">
+          <div class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4z"/><path d="M13 4h7v7h-7z"/><path d="M4 13h7v7H4z"/><path d="M13 13h7v7h-7z"/></svg>
+            </span>
+            <div class="info">
+              <div class="n">网格员</div>
+              <div class="u">渝州路社区第3网格</div>
+            </div>
+          </div>
+          <div class="go">进入看板 ›</div>
+        </button>
+      </div>
+      <div class="config-wrap"><button id="apiSetBtn" class="config-link" type="button">后端地址配置</button></div>
+      <div class="footer">重庆市九龙坡区医疗保障中心</div>
+    </div>
+  </div>
+  <div id="apiModal" class="api-modal">
+    <div class="api-modal-card" role="dialog" aria-modal="true" aria-labelledby="apiModalTitle">
+      <div id="apiModalTitle" class="api-modal-title">后端地址配置</div>
+      <div id="apiCurrent" class="api-current"></div>
+      <input id="apiInput" class="api-input" placeholder="请输入后端地址（示例：https://your-api.example.com）" />
+      <div class="api-actions">
+        <button id="apiCancelBtn" type="button" class="api-action">取消</button>
+        <button id="apiSaveBtn" type="button" class="api-action primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 密码输入弹窗（由 js/login.js 驱动，无需在前端硬编码密码） -->
+  <div id="pwdModal" class="api-modal">
+    <div class="api-modal-card" role="dialog" aria-modal="true" aria-labelledby="pwdRoleLabel">
+      <div id="pwdRoleLabel" class="api-modal-title">请输入登录密码</div>
+      <input id="pwdInput" class="api-input" type="password"
+             placeholder="请输入您的登录密码" autocomplete="current-password" />
+      <div id="pwdErrMsg" style="font-size:12px;color:#dc2626;min-height:18px;margin-top:4px;"></div>
+      <div class="api-actions">
+        <button id="pwdCancelBtn" type="button" class="api-action">取消</button>
+        <button id="pwdConfirmBtn" type="button" class="api-action primary">确认登录</button>
+      </div>
+    </div>
+  </div>
+  <script src="js/login.js"></script>
+</body>
+</html>

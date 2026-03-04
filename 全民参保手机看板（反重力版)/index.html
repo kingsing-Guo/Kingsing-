@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>全民参保数智动员手机看板</title>
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body>
+  <div class="app">
+    <div class="top">
+      <div class="title-row">
+        <div class="title" style="font-size:22px">全民参保数智动员手机看板</div>
+        <button class="back-login" id="backLoginBtn">返回登录</button>
+      </div>
+      <div class="userbox">
+        <div class="sub" id="userNameText">当前用户：-</div>
+        <div class="user-sub-row">
+          <div class="sub" id="unitText">所在单位：-</div>
+          <div class="year-inline">
+            <span>参保年度</span>
+            <select id="yearSelect"></select>
+          </div>
+        </div>
+      </div>
+      <div class="view-controls" id="viewControls">
+        <select id="levelSelect"></select>
+        <select id="streetSelect"></select>
+        <select id="villageSelect"></select>
+      </div>
+      <div class="viewing" id="viewingText">当前查看：-</div>
+    </div>
+
+    <div class="section-nav" id="leaderSectionNav">
+      <div class="section-nav-label" id="navTopBtn"><span class="t">板块导航</span><span class="s">点击跳转</span></div>
+      <button class="nav-chip" data-target="sec-overview">目标完成</button>
+      <button class="nav-chip" data-target="sec-rank">区域排名</button>
+      <button class="nav-chip" data-target="sec-stock">存量增量</button>
+      <button class="nav-chip" data-target="sec-loss">减员分析</button>
+      <button class="nav-chip" data-target="sec-household">户籍分析</button>
+      <button class="nav-chip" data-target="sec-people">年龄性别</button>
+      <button class="nav-chip" data-target="sec-key">重点对象</button>
+      <button class="nav-chip" data-target="sec-staff">职工参保</button>
+      <button class="nav-chip" data-target="sec-risk">风险监测</button>
+    </div>
+
+    <div id="leaderPanel" class="role-panels active">
+      <div class="section" id="sec-overview"><h3 data-icon="overview">目标完成情况分析</h3><div class="cards" id="overviewCards"></div></div>
+      <div class="section" id="sec-rank"><h3 data-icon="rank">区域参保情况排名</h3><div class="panel" id="mapPanel"></div></div>
+      <div class="section" id="sec-stock"><h3 data-icon="stock">存量巩固与增量扩面</h3><div class="panel" id="stockPanel"></div></div>
+      <div class="section" id="sec-loss"><h3 data-icon="loss">存量减员情况分析</h3><div class="panel" id="lossPanel"></div></div>
+      <div class="section" id="sec-household"><h3 data-icon="household">户籍参保情况分析</h3><div class="panel" id="householdPanel"></div></div>
+      <div class="section" id="sec-people"><h3 data-icon="people">性别年龄分布分析</h3><div class="panel" id="structurePanel"></div></div>
+      <div class="section" id="sec-key"><h3 data-icon="key">重点对象参保分析</h3><div class="panel" id="keyPanel"></div></div>
+      <div class="section" id="sec-staff"><h3 data-icon="company">职工参保情况分析</h3><div class="panel" id="staffPanel"></div></div>
+      <div class="section" id="sec-risk"><h3 data-icon="risk">参保风险与异常监测</h3><div class="panel" id="riskPanel"></div></div>
+    </div>
+
+    <div id="workerPanel" class="role-panels">
+      <div class="section"><h3 data-icon="target">我的目标与完成情况</h3><div class="cards" id="workerOverview"></div></div>
+      <div class="section"><h3 data-icon="todo">待动员名单</h3><div class="panel" id="workerTodo"></div></div>
+      <div class="section"><h3 data-icon="company">企业风险走访清单</h3><div class="panel" id="workerRisk"></div></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-head">
+      <strong id="drawerTitle">明细名单</strong>
+      <div class="drawer-head-right">
+        <button class="btn-mini" id="drawerClose">返回</button>
+      </div>
+    </div>
+    <div class="filters">
+      <input id="searchName" placeholder="姓名/企业名称（模糊）" />
+      <input id="searchSecond" placeholder="联系电话/联系人（模糊）" />
+      <input id="searchAddress" placeholder="地址（户籍/居住/企业地址，模糊）" />
+    </div>
+    <div class="drawer-tools">
+      <div class="drawer-result" id="drawerResultText">当前筛选结果：0 条</div>
+      <div class="drawer-tool-right">
+        <label class="phone-toggle"><input type="checkbox" id="phoneToggle" /> 显示完整号码</label>
+        <button class="btn-mini" id="conditionBtn">条件筛选</button>
+      </div>
+    </div>
+    <div class="cond-panel" id="condPanel">
+      <div class="cond-head">
+        <b>条件筛选</b>
+        <div class="cond-actions">
+          <button class="btn-mini" id="condReset">重置</button>
+          <button class="btn-mini" id="condApply">确定</button>
+        </div>
+      </div>
+      <div class="cond-type">
+        <div class="cond-group-title">对象类型</div>
+        <select id="drawerType"></select>
+      </div>
+      <div class="cond-groups" id="condGroups"></div>
+    </div>
+    <div id="drawerList"></div>
+  </div>
+  <div class="archive-modal" id="archiveModal">
+    <div class="archive-sheet">
+      <div class="archive-head">
+        <div>
+          <div class="archive-title" id="archiveTitle">对象档案</div>
+          <div class="archive-sub" id="archiveSub">完整医保参保缴费情况档案</div>
+        </div>
+        <button class="btn-mini" id="archiveClose">返回</button>
+      </div>
+      <div id="archiveBody"></div>
+    </div>
+  </div>
+
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

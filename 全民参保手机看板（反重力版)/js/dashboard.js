@@ -1,0 +1,2720 @@
+const ROAD_COMMUNITY_MAP = {
+  九龙园区大道: "九龙园区社区",
+  渝州路: "渝州路社区",
+  科园一路: "科园一路社区",
+  石杨路: "石桥铺社区",
+  前进路: "前进路社区",
+  天兴路: "天兴路社区",
+  团结路: "团结路社区",
+  铝城大道: "铝城村"
+};
+
+const STAFF_CONFIG = {
+  // 职工参保人员细类口径（合计建议为 1）
+  detailRatio: {
+    onjob: 0.34,          // 在职职工
+    orgRetired: 0.12,     // 单位退休人员
+    flex1: 0.2,           // 灵活就业（一档）
+    flex2: 0.14,          // 灵活就业（二档）
+    personRetired1: 0.1,  // 个人退休（一档）
+    personRetired2: 0.1   // 个人退休（二档）
+  },
+  // 单位参保口径（用于参加/未参加职工保单位数及环比）
+  unitInsuredRate: 0.74,
+  unitInsuredRateLastMonth: 0.71
+};
+
+function seededRand(seed) {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function pickStaffDetail(seed) {
+  const defs = [
+    { key: "在职职工", big: "单位参保", w: STAFF_CONFIG.detailRatio.onjob },
+    { key: "单位退休人员", big: "单位参保", w: STAFF_CONFIG.detailRatio.orgRetired },
+    { key: "灵活就业（一档）", big: "个人参保（灵活就业）", w: STAFF_CONFIG.detailRatio.flex1 },
+    { key: "灵活就业（二档）", big: "个人参保（灵活就业）", w: STAFF_CONFIG.detailRatio.flex2 },
+    { key: "个人退休（一档）", big: "个人参保（灵活就业）", w: STAFF_CONFIG.detailRatio.personRetired1 },
+    { key: "个人退休（二档）", big: "个人参保（灵活就业）", w: STAFF_CONFIG.detailRatio.personRetired2 }
+  ];
+  const total = defs.reduce((s, d) => s + Math.max(d.w || 0, 0), 0) || 1;
+  let p = seededRand(seed);
+  let acc = 0;
+  for (const d of defs) {
+    acc += (Math.max(d.w || 0, 0) / total);
+    if (p <= acc) return d;
+  }
+  return defs[0];
+}
+
+const data = {
+  district: "重庆市九龙坡区",
+  streets: [
+    { name: "杨家坪街道", villages: [mkVillage("杨家坪街道", "天兴路社区", 1820, 1660), mkVillage("杨家坪街道", "前进路社区", 1460, 1320), mkVillage("杨家坪街道", "团结路社区", 1300, 1156)] },
+    { name: "石桥铺街道", villages: [mkVillage("石桥铺街道", "渝州路社区", 2100, 1908), mkVillage("石桥铺街道", "高新区社区", 1740, 1586), mkVillage("石桥铺街道", "科园一路社区", 980, 824)] },
+    { name: "西彭镇", villages: [mkVillage("西彭镇", "西彭社区", 2020, 1830), mkVillage("西彭镇", "森迪村", 1210, 1038), mkVillage("西彭镇", "铝城村", 1160, 948)] }
+  ]
+};
+
+function formatStdAddress(admin, road, doorNo, floorNo, roomNo) {
+  return `${admin}${road}${doorNo}号${Number(floorNo)}层${String(roomNo).padStart(2, "0")}室`;
+}
+function parseStdAddress(addr) {
+  if (!addr) return null;
+  const m = String(addr).match(/^(.*?(?:街道|镇))(.*?)(\d+)号(\d+)层(\d+)室$/);
+  if (!m) return null;
+  return {
+    admin: m[1],
+    road: m[2],
+    doorNo: Number(m[3]),
+    floorNo: Number(m[4]),
+    roomNo: Number(m[5]),
+    buildingKey: `${m[1]}${m[2]}${m[3]}号`,
+    roomKey: `${m[4]}层${m[5]}室`
+  };
+}
+function getManagementAreaFromAddress(addr) {
+  const parsed = parseStdAddress(addr);
+  if (!parsed) return "-";
+  const community = ROAD_COMMUNITY_MAP[parsed.road] || `${parsed.road}社区`;
+  return `${parsed.admin}${community}`;
+}
+function parseBuildingKey(buildingKey) {
+  if (!buildingKey) return null;
+  const m = String(buildingKey).match(/^(.*?(?:街道|镇))(.*?)(\d+)号$/);
+  if (!m) return null;
+  return { admin: m[1], road: m[2], doorNo: Number(m[3]) };
+}
+function getManagementAreaFromBuildingKey(buildingKey) {
+  const parsed = parseBuildingKey(buildingKey);
+  if (!parsed) return "-";
+  const community = ROAD_COMMUNITY_MAP[parsed.road] || `${parsed.road}社区`;
+  return `${parsed.admin}${community}`;
+}
+function getBuildingAreaType(buildingKey) {
+  const parsed = parseBuildingKey(buildingKey);
+  const road = parsed ? parsed.road : "";
+  if (["九龙园区大道", "铝城大道"].includes(road)) return "工业园区";
+  if (["渝州路", "石杨路", "科园一路"].includes(road)) return "商业圈";
+  if (["前进路", "天兴路", "团结路"].includes(road)) return "生活小区";
+  return "其他";
+}
+const CONFIRMED_LOSS_TYPES = new Set(["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"]);
+function isConfirmedLossResident(r) {
+  return CONFIRMED_LOSS_TYPES.has(r.stockChangeType) || CONFIRMED_LOSS_TYPES.has(r.lossReason);
+}
+function isStockMobilizableResident(r) {
+  return !!r.lastYearLocalPaid && !r.thisYearPaid && r.stockChangeType === "可动员" && !isConfirmedLossResident(r);
+}
+function isIncrementPotentialResident(r) {
+  return (
+    !r.thisYearPaid &&
+    !isConfirmedLossResident(r) &&
+    ((!r.lastYearPaid) || (r.lastYearPaid && !r.lastYearLocalPaid)) &&
+    (r.household === "本区户籍" || r.residence === "本区居住")
+  );
+}
+function normalizeResidentRecord(r, seed = 1) {
+  const age = Number(r.age || 0);
+  const paid = !!r.thisYearPaid;
+  let thisYearPaid = paid;
+  let thisYearType = r.thisYearType || (thisYearPaid ? "居民保" : "未参保");
+  let insuredPlace = r.insuredPlace || "";
+  let stockChangeType = r.stockChangeType || "";
+  let lossReason = r.lossReason || "";
+  const hardship = !!r.isHardship || !!r.hardshipType || r.keyGroup === "资助对象";
+
+  if (!thisYearPaid) {
+    thisYearType = "未参保";
+    insuredPlace = "";
+  } else if (!["居民保", "职工保"].includes(thisYearType)) {
+    thisYearType = "居民保";
+  }
+  if (age < 18 && thisYearType === "职工保") {
+    thisYearType = thisYearPaid ? "居民保" : "未参保";
+    r.staffBigType = "";
+    r.staffDetailType = "";
+  }
+
+  if (CONFIRMED_LOSS_TYPES.has(stockChangeType)) lossReason = stockChangeType;
+  if (!stockChangeType && CONFIRMED_LOSS_TYPES.has(lossReason)) stockChangeType = lossReason;
+
+  if (stockChangeType === "可动员") {
+    thisYearPaid = false;
+    thisYearType = "未参保";
+    insuredPlace = "";
+    lossReason = "";
+  } else if (stockChangeType === "死亡" || stockChangeType === "停保") {
+    thisYearPaid = false;
+    thisYearType = "未参保";
+    insuredPlace = "";
+  } else if (stockChangeType === "转职工保（含灵活就业参保）") {
+    thisYearPaid = true;
+    thisYearType = "职工保";
+  } else if (stockChangeType === "存量续保") {
+    thisYearPaid = true;
+    thisYearType = "居民保";
+    insuredPlace = insuredPlace || "本区县参保";
+  }
+
+  if (!r.lastYearLocalPaid && ["可动员", "存量续保"].includes(stockChangeType)) {
+    stockChangeType = "";
+    lossReason = "";
+  }
+  if (thisYearPaid && !insuredPlace) insuredPlace = "本区县参保";
+  if (thisYearPaid && r.pauseFlow) r.pauseFlow = "";
+
+  let keyGroup = "无";
+  if (age <= 1) keyGroup = "新生儿";
+  else if (age >= 6 && age <= 18 && (r.keyGroup === "中小学生" || !!r.isPrimarySecondary)) keyGroup = "中小学生";
+  else if (age >= 16 && age <= 30 && (r.keyGroup === "高校生" || !!r.isCollege)) keyGroup = "高校生";
+  else if (hardship) keyGroup = "资助对象";
+
+  r.age = age;
+  r.ageGroup = age <= 16 ? "16岁及以下" : age <= 30 ? "16-30岁" : age <= 45 ? "31-45岁" : age <= 60 ? "46-60岁" : "60岁以上";
+  r.thisYearPaid = thisYearPaid;
+  r.thisYearType = thisYearType;
+  r.insuredPlace = insuredPlace;
+  r.stockChangeType = stockChangeType;
+  r.lossReason = lossReason;
+  r.keyGroup = keyGroup;
+  r.isPrimarySecondary = keyGroup === "中小学生";
+  r.isCollege = keyGroup === "高校生";
+  r.isHardship = hardship || keyGroup === "资助对象";
+  if (r.isHardship && !r.hardshipType) {
+    r.hardshipType = ["低保对象", "残疾对象", "特困对象"][Math.abs(seed) % 3];
+  }
+  if (!r.isHardship) r.hardshipType = "";
+  if (thisYearType !== "职工保") {
+    r.staffBigType = "";
+    r.staffDetailType = "";
+  }
+  r.reason = stockChangeType === "可动员" ? "存量未参保（可动员）" : (stockChangeType || (!thisYearPaid ? "未参保" : "已参保"));
+  return r;
+}
+function normalizeAllResidentDataSets() {
+  let seed = 7;
+  (data.streets || []).forEach(s => {
+    (s.villages || []).forEach(v => {
+      (v.residents || []).forEach(r => {
+        seed += 17;
+        normalizeResidentRecord(r, seed);
+      });
+    });
+  });
+}
+function runRelationAudit() {
+  const villages = data.streets.flatMap(s => s.villages || []);
+  const issues = [];
+  villages.forEach(v => {
+    const rs = v.residents || [];
+    const es = v.enterprises || [];
+
+    // 1) 同户（familyId）应共享同一户籍地址
+    const familyAddrMap = new Map();
+    rs.forEach(r => {
+      if (!r.familyId) return;
+      if (!familyAddrMap.has(r.familyId)) familyAddrMap.set(r.familyId, new Set());
+      if (r.hukouAddress) familyAddrMap.get(r.familyId).add(r.hukouAddress);
+    });
+    familyAddrMap.forEach((addrSet, familyId) => {
+      if (addrSet.size > 1) {
+        issues.push(`[户址不一致] ${v.name} ${familyId} -> ${[...addrSet].join(" | ")}`);
+      }
+    });
+
+    // 2) 企业员工可按注册地址归集到楼栋（用于一楼一档）
+    const entBuilding = new Map();
+    es.forEach(e => {
+      const p = parseStdAddress(e.regAddress);
+      if (p) entBuilding.set(e.id, p.buildingKey);
+    });
+    const buildingStaffCount = new Map();
+    rs.forEach(r => {
+      if (!r.employerId) return;
+      const bk = entBuilding.get(r.employerId);
+      if (!bk) return;
+      buildingStaffCount.set(bk, (buildingStaffCount.get(bk) || 0) + 1);
+    });
+    es.forEach(e => {
+      const staffCnt = rs.filter(r => r.employerId === e.id).length;
+      const bk = entBuilding.get(e.id);
+      if (!bk) return;
+      const groupedCnt = buildingStaffCount.get(bk) || 0;
+      if (staffCnt > 0 && groupedCnt === 0) {
+        issues.push(`[楼栋归集异常] ${v.name} ${e.name} staff=${staffCnt} building=${bk}`);
+      }
+    });
+    // 3) 逻辑口径快速校验
+    rs.forEach(r => {
+      if (r.keyGroup === "新生儿" && (r.age || 0) > 1) issues.push(`[年龄冲突] ${v.name} ${r.name} 新生儿 age=${r.age}`);
+      if (r.keyGroup === "中小学生" && !((r.age || 0) >= 6 && (r.age || 0) <= 18)) issues.push(`[年龄冲突] ${v.name} ${r.name} 中小学生 age=${r.age}`);
+      if (r.keyGroup === "高校生" && !((r.age || 0) >= 16 && (r.age || 0) <= 30)) issues.push(`[年龄冲突] ${v.name} ${r.name} 高校生 age=${r.age}`);
+      if ((r.age || 0) < 18 && r.thisYearType === "职工保") issues.push(`[年龄冲突] ${v.name} ${r.name} 未满18岁却职工保`);
+      if (isConfirmedLossResident(r) && isStockMobilizableResident(r)) issues.push(`[可动员冲突] ${v.name} ${r.name} 已确认减员却仍可动员`);
+    });
+  });
+  if (issues.length) {
+    console.warn(`[关系校验] 发现 ${issues.length} 个问题`, issues.slice(0, 20));
+  } else {
+    console.info("[关系校验] 通过：人/户/企/楼关联一致。");
+  }
+}
+normalizeAllResidentDataSets();
+runRelationAudit();
+
+function mkVillage(streetName, name, target, current) {
+  const uninsured = Math.max(target - current, 0);
+  const villageSalt = Array.from(name).reduce((s, ch) => s + ch.charCodeAt(0), 0);
+  const residentPool = ["李明", "张华", "王芳", "赵刚", "周婷", "陈俊", "杨雪", "吴鹏", "刘洋", "黄敏", "何磊", "宋佳", "邓洁", "潘凯", "周文", "何杰"];
+  const companyPool = ["宏达科技", "九龙物流", "渝新制造", "兴业商贸", "巴渝建工", "成信餐饮", "腾跃电子", "弘博服务", "云创医疗", "华腾教育"];
+  const industries = ["制造业", "建筑业", "批发和零售业", "交通运输、仓储和邮政业", "住宿和餐饮业", "信息传输、软件和信息技术服务业", "金融业", "房地产业", "租赁和商务服务业", "教育", "卫生和社会工作"];
+  const scales = ["小微", "中型", "大型"];
+  const unitTypes = ["企业", "个体", "机关", "事业", "社会组织"];
+  const unitNatures = ["国企", "民企", "混合", "外资", "中外合资"];
+  const lossReasons = ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"];
+  const roadPool = ["九龙园区大道", "渝州路", "科园一路", "石杨路", "前进路", "天兴路", "团结路", "铝城大道"];
+  const hukouAdminPool = [
+    `重庆市九龙坡区${streetName}`,
+    "重庆市九龙坡区杨家坪街道",
+    "重庆市九龙坡区石桥铺街道",
+    "重庆市九龙坡区西彭镇"
+  ];
+  const liveAdminPool = {
+    "本辖区": `重庆市九龙坡区${streetName}`,
+    "区内其他辖区": streetName === "杨家坪街道" ? "重庆市九龙坡区石桥铺街道" : "重庆市九龙坡区杨家坪街道",
+    "市内外区": "重庆市渝中区上清寺街道",
+    "市外": "四川省成都市武侯区簇锦街道"
+  };
+
+  let underageStaffCorrected = 0;
+  const residents = Array.from({ length: Math.max(Math.floor(uninsured * 0.7), 24) }, (_, i) => {
+    const serial = (villageSalt % 89) * 1000 + (i + 1);
+    const familyIndex = Math.floor(i / 3);
+    const familyMemberIndex = i % 3;
+    const familySeed = familyIndex + villageSalt;
+    const addrSeed = i + villageSalt;
+    const age = (i * 4) % 76;
+    const gender = i % 2 === 0 ? "男" : "女";
+    const household = familySeed % 3 === 0 ? "本区户籍" : "非本区户籍";
+    let residenceDetail = "本辖区";
+    if (household === "本区户籍") {
+      const m = i % 20;
+      residenceDetail = m < 8 ? "本辖区" : (m < 12 ? "区内其他辖区" : (m < 17 ? "市内外区" : "市外"));
+    } else {
+      const m = i % 20;
+      residenceDetail = m < 7 ? "本辖区" : (m < 10 ? "区内其他辖区" : (m < 15 ? "市内外区" : "市外"));
+    }
+    const residence = residenceDetail === "本辖区" ? "本区居住" : "外区居住";
+    const isPrimarySecondary = age >= 6 && age <= 18 && i % 2 === 0;
+    const isCollege = age >= 16 && age <= 30 && i % 3 === 0;
+    const isHardship = i % 7 === 0 || i % 11 === 0;
+    const keyGroup = age <= 1 ? "新生儿" : (isPrimarySecondary ? "中小学生" : (isCollege ? "高校生" : (isHardship ? "资助对象" : "无")));
+    const hardshipType = isHardship ? ["低保对象", "残疾对象", "特困对象"][i % 3] : "";
+    const lastYearPaid = i % 5 !== 0;
+    const lastYearLocalPaid = lastYearPaid && (i % 4 !== 0);
+    const thisYearPaid = i % 6 !== 0;
+    let thisYearType = thisYearPaid ? ((age >= 18 && i % 5 === 0) ? "职工保" : "居民保") : "未参保";
+    // 防呆校验：未满18周岁不得归入职工保，自动纠正为居民保
+    if (age < 18 && thisYearType === "职工保") {
+      thisYearType = "居民保";
+      underageStaffCorrected += 1;
+    }
+    let staffBigType = "";
+    let staffDetailType = "";
+    if (thisYearType === "职工保") {
+      const d = pickStaffDetail((target + current + i + 1) * 17);
+      staffBigType = d.big;
+      staffDetailType = d.key;
+    }
+    let insuredPlace = "";
+    if (thisYearPaid) {
+      const p = (i * 7) % 10;
+      insuredPlace = p < (household === "本区户籍" ? 6 : 4) ? "本区县参保" : (p < (household === "本区户籍" ? 8 : 7) ? "市内外区参保" : "市外参保");
+    }
+    let stockChangeType = "";
+    let lossReason = "";
+    if (lastYearLocalPaid) {
+      const retained = thisYearPaid && thisYearType === "居民保" && insuredPlace === "本区县参保";
+      if (retained) stockChangeType = "存量续保";
+      else if (!thisYearPaid) stockChangeType = i % 3 === 0 ? "可动员" : (i % 2 === 0 ? "停保" : "死亡");
+      else if (thisYearType === "职工保") stockChangeType = "转职工保（含灵活就业参保）";
+      else stockChangeType = "辖区外参保";
+      if (lossReasons.includes(stockChangeType)) lossReason = stockChangeType;
+    }
+    const pauseFlow = !thisYearPaid ? (i % 3 === 0 ? "转居民保" : (i % 3 === 1 ? "申请停保" : "跨区转出")) : "";
+    const ageGroup = age <= 16 ? "16岁及以下" : age <= 30 ? "16-30岁" : age <= 45 ? "31-45岁" : age <= 60 ? "46-60岁" : "60岁以上";
+    const phoneMid = ((500000000 + addrSeed * 97) % 1000000000).toString().padStart(9, "0");
+    const phone = `13${phoneMid}`;
+    // 户籍地址按“户”维度生成：同一familyId成员共用同一户籍地址
+    const hukouRoad = roadPool[familySeed % roadPool.length];
+    const hukouDoorNo = (familySeed % 120) + 1;
+    const hukouFloorNo = (familySeed % 22) + 1;
+    const hukouRoomNo = (familySeed % 4) + 1;
+    const hukouAdmin = hukouAdminPool[familySeed % hukouAdminPool.length];
+    const hukouAddress = formatStdAddress(hukouAdmin, hukouRoad, hukouDoorNo, hukouFloorNo, hukouRoomNo);
+
+    const liveRoad = roadPool[(addrSeed + 3) % roadPool.length];
+    const liveDoorNo = (addrSeed % 120) + 1;
+    const liveFloorNo = (addrSeed % 22) + 1;
+    const liveRoomNo = ((addrSeed + 1) % 4) + 1;
+    const liveAdmin = liveAdminPool[residenceDetail] || liveAdminPool["本辖区"];
+    const livingAddress = formatStdAddress(liveAdmin, liveRoad, liveDoorNo, liveFloorNo, liveRoomNo);
+    const liveParsed = parseStdAddress(livingAddress);
+    const hukouParsed = parseStdAddress(hukouAddress);
+    const familyId = `F-${name}-${familyIndex}`;
+    const familyRole = ["户主", "配偶", "子女"][familyMemberIndex] || "成员";
+    return {
+      id: `R-${name}-${serial}`,
+      type: "居民",
+      name: residentPool[i % residentPool.length] + serial,
+      reason: stockChangeType === "可动员" ? "存量未参保（可动员）" : (stockChangeType || (!thisYearPaid ? "未参保" : "已参保")),
+      age, ageGroup, gender, household, residence, residenceDetail, insuredPlace,
+      phone, hukouAddress, livingAddress,
+      staffBigType, staffDetailType,
+      hardshipType,
+      isPrimarySecondary, isCollege, isHardship,
+      keyGroup, lastYearPaid, lastYearLocalPaid, thisYearPaid, thisYearType, stockChangeType, lossReason, pauseFlow,
+      familyId, familyRole,
+      buildingId: liveParsed ? liveParsed.buildingKey : "",
+      buildingName: liveParsed ? liveParsed.buildingKey : "",
+      floorNo: liveParsed ? liveParsed.floorNo : 1,
+      roomNo: liveParsed ? String(liveParsed.roomNo).padStart(2, "0") : "01",
+      roomId: liveParsed ? `${liveParsed.buildingKey}-${liveParsed.roomKey}` : "",
+      hukouBuildingId: hukouParsed ? hukouParsed.buildingKey : "",
+      hukouFloorNo: hukouParsed ? hukouParsed.floorNo : 1,
+      hukouRoomNo: hukouParsed ? String(hukouParsed.roomNo).padStart(2, "0") : "01",
+      hukouRoomId: hukouParsed ? `${hukouParsed.buildingKey}-${hukouParsed.roomKey}` : "",
+      employerId: "",
+      employerName: "",
+      duration: 1 + (i % 8),
+      place: name
+    };
+  });
+  if (underageStaffCorrected > 0) {
+    console.warn(`[口径校验] ${name} 自动纠正 ${underageStaffCorrected} 条“<18岁且职工保”为“居民保”。`);
+  }
+
+  const enterprises = Array.from({ length: Math.max(Math.floor(uninsured * 0.3), 8) }, (_, i) => {
+    const serial = (villageSalt % 97) * 1000 + (i + 1);
+    const addrSeed = i + villageSalt;
+    const risk = i % 3 === 0 ? "高" : (i % 3 === 1 ? "中" : "低");
+    const rand1 = seededRand((target + i + 11) * 13);
+    const rand2 = seededRand((current + i + 19) * 29);
+    const staffInsured = rand1 < STAFF_CONFIG.unitInsuredRate;
+    const lastMonthStaffInsured = rand2 < STAFF_CONFIG.unitInsuredRateLastMonth;
+    const regAdmin = `重庆市九龙坡区${streetName}`;
+    const regRoad = roadPool[(addrSeed + 5) % roadPool.length];
+    const regDoorNo = (addrSeed % 120) + 1;
+    const regFloorNo = (addrSeed % 18) + 1;
+    const regRoomNo = ((addrSeed + 2) % 6) + 1;
+    const unitType = unitTypes[(addrSeed + 1) % unitTypes.length];
+    const industryClass = industries[(addrSeed + 3) % industries.length];
+    const unitNature = unitNatures[(addrSeed + 5) % unitNatures.length];
+    const managementArea = getManagementAreaFromAddress(formatStdAddress(regAdmin, regRoad, regDoorNo, regFloorNo, regRoomNo));
+    return {
+      id: `E-${name}-${serial}`,
+      type: "企业",
+      name: companyPool[i % companyPool.length] + serial,
+      legalPerson: ["李强", "王磊", "张敏", "赵军", "陈涛"][i % 5],
+      contactPerson: ["刘经理", "周主管", "黄主任", "何女士", "杨先生"][i % 5],
+      phone: `18${((300000000 + addrSeed * 61) % 1000000000).toString().padStart(9, "0")}`,
+      regAddress: formatStdAddress(regAdmin, regRoad, regDoorNo, regFloorNo, regRoomNo),
+      managementArea,
+      unitType,
+      industryClass,
+      unitNature,
+      reason: i % 2 === 0 ? "欠费超3个月" : "缴费基数做实率偏低",
+      duration: 2 + (i % 10),
+      gapRate: 8 + (i % 15),
+      industry: industryClass,
+      scale: scales[i % scales.length],
+      staffInsured,
+      lastMonthStaffInsured,
+      risk,
+      place: name
+    };
+  });
+  const localStaff = residents.filter(r => r.thisYearType === "职工保");
+  localStaff.forEach((r, i) => {
+    const company = enterprises[i % enterprises.length];
+    if (company) {
+      r.employerId = company.id;
+      r.employerName = company.name;
+    }
+  });
+  // 补充“历史关联员工”，用于企业档案展示停保/转保等状态
+  residents
+    .filter(r => r.age >= 18 && !r.employerId)
+    .forEach((r, i) => {
+      if (seededRand((villageSalt + i + target + current) * 37) > 0.2) return;
+      const company = enterprises[(i * 3 + villageSalt) % enterprises.length];
+      if (!company) return;
+      r.employerId = company.id;
+      r.employerName = company.name;
+      if (!r.staffBigType) r.staffBigType = "单位参保";
+      if (!r.staffDetailType) r.staffDetailType = r.age >= 55 ? "单位退休人员" : "在职职工";
+    });
+
+  return { name, target, current, residents, enterprises };
+}
+
+const state = {
+  identity: "district_leader",
+  role: "leader",
+  insuranceYear: new Date().getFullYear(),
+  level: "district",
+  street: data.streets[0].name,
+  village: data.streets[0].villages[0].name,
+  drawer: null,
+  archive: null,
+  showFullPhone: false,
+  areaRankSort: "total",
+  areaRankExpanded: false,
+  selectedTags: [],
+  folds: {
+    target: true,
+    done: true,
+    doneResident: false,
+    gap: true,
+    gapResident: false
+  }
+};
+
+function normalizeApiBase(v) {
+  return (v || "").trim().replace(/\/+$/, "");
+}
+function resolveApiBase() {
+  const q = new URLSearchParams(location.search);
+  const fromQuery = normalizeApiBase(q.get("apiBase") || "");
+  if (fromQuery) {
+    localStorage.setItem("dashboard_api_base", fromQuery);
+    return fromQuery;
+  }
+  const session = JSON.parse(localStorage.getItem("dashboard_session") || "{}");
+  const fromSession = normalizeApiBase(session.apiBase || "");
+  if (fromSession) return fromSession;
+  const fromStorage = normalizeApiBase(localStorage.getItem("dashboard_api_base") || "");
+  if (fromStorage) return fromStorage;
+  if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+    return `${location.protocol}//${location.hostname}:8787`;
+  }
+  return "http://127.0.0.1:8787";
+}
+const API_BASE = resolveApiBase();
+let apiToken = (JSON.parse(localStorage.getItem("dashboard_session") || "{}").token) || "";
+
+function mergeProfileToIdentity(identity, profile) {
+  if (!identityProfiles[identity] || !profile) return;
+  identityProfiles[identity] = {
+    ...identityProfiles[identity],
+    label: profile.label || identityProfiles[identity].label,
+    userName: profile.userName || identityProfiles[identity].userName,
+    unit: profile.unit || identityProfiles[identity].unit,
+    roles: Array.isArray(profile.roles) && profile.roles.length ? profile.roles : identityProfiles[identity].roles,
+    levels: Array.isArray(profile.levels) && profile.levels.length ? profile.levels : identityProfiles[identity].levels,
+    street: profile.street ?? identityProfiles[identity].street,
+    village: profile.village ?? identityProfiles[identity].village
+  };
+}
+
+async function loadBootstrapFromApi() {
+  if (!apiToken) return false;
+  const resp = await fetch(`${API_BASE}/api/bootstrap?year=${encodeURIComponent(state.insuranceYear)}`, {
+    headers: { Authorization: `Bearer ${apiToken}` }
+  });
+  if (!resp.ok) return false;
+  const json = await resp.json();
+  if (!json.ok || !json.dashboard || !Array.isArray(json.dashboard.streets)) return false;
+  data.district = json.dashboard.district || data.district;
+  data.streets = json.dashboard.streets;
+  normalizeAllResidentDataSets();
+  runRelationAudit();
+  if (json.profile && json.profile.identity && identityProfiles[json.profile.identity]) {
+    state.identity = json.profile.identity;
+    state.role = (json.profile.roles || ["leader"])[0];
+    mergeProfileToIdentity(state.identity, json.profile);
+  }
+  return true;
+}
+
+// 条件筛选固定口径字典：分组顺序与子标签保持不变（与穿透指标无关）
+const FIXED_TAG_SCHEMA = [
+  { group: "人员性别", tags: ["男", "女"] },
+  { group: "居民户籍", tags: ["本区户籍", "非本区户籍"] },
+  { group: "居民居住", tags: ["本区居住", "外区居住"] },
+  { group: "居民居住细分", tags: ["本辖区", "区内其他辖区", "市内外区", "市外"] },
+  { group: "参保地", tags: ["本区县参保", "市内外区参保", "市外参保"] },
+  { group: "今年参保类型", tags: ["居民保", "职工保", "未参保"] },
+  { group: "存量变化类型", tags: ["存量续保", "可动员", "停保", "死亡", "辖区外参保", "转职工保（含灵活就业参保）"] },
+  { group: "存量减员原因", tags: ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"] },
+  { group: "职工减员流向", tags: ["转居民保", "申请停保", "跨区转出"] },
+  { group: "重点对象", tags: ["新生儿", "中小学生", "高校生", "资助对象"] },
+  { group: "资助对象细类", tags: ["低保对象", "残疾对象", "特困对象"] },
+  { group: "职工参保大类", tags: ["单位参保", "个人参保（灵活就业）"] },
+  { group: "职工参保细类", tags: ["在职职工", "单位退休人员", "灵活就业（一档）", "灵活就业（二档）", "个人退休（一档）", "个人退休（二档）"] },
+  { group: "企业风险等级", tags: ["高", "中", "低"] },
+  { group: "单位参保状态", tags: ["参加职工保", "未参加职工保"] }
+];
+
+const els = {
+  userNameText: document.getElementById("userNameText"),
+  unitText: document.getElementById("unitText"),
+  viewingText: document.getElementById("viewingText"),
+  yearSelect: document.getElementById("yearSelect"),
+  viewControls: document.getElementById("viewControls"),
+  levelSelect: document.getElementById("levelSelect"),
+  streetSelect: document.getElementById("streetSelect"),
+  villageSelect: document.getElementById("villageSelect"),
+  leaderSectionNav: document.getElementById("leaderSectionNav"),
+  overviewCards: document.getElementById("overviewCards"),
+  mapPanel: document.getElementById("mapPanel"),
+  stockPanel: document.getElementById("stockPanel"),
+  structurePanel: document.getElementById("structurePanel"),
+  householdPanel: document.getElementById("householdPanel"),
+  keyPanel: document.getElementById("keyPanel"),
+  lossPanel: document.getElementById("lossPanel"),
+  staffPanel: document.getElementById("staffPanel"),
+  riskPanel: document.getElementById("riskPanel"),
+  workerOverview: document.getElementById("workerOverview"),
+  workerTodo: document.getElementById("workerTodo"),
+  workerRisk: document.getElementById("workerRisk"),
+  leaderPanel: document.getElementById("leaderPanel"),
+  workerPanel: document.getElementById("workerPanel"),
+  drawer: document.getElementById("drawer"),
+  overlay: document.getElementById("overlay"),
+  drawerTitle: document.getElementById("drawerTitle"),
+  drawerType: document.getElementById("drawerType"),
+  conditionBtn: document.getElementById("conditionBtn"),
+  condPanel: document.getElementById("condPanel"),
+  condGroups: document.getElementById("condGroups"),
+  condApply: document.getElementById("condApply"),
+  condReset: document.getElementById("condReset"),
+  drawerResultText: document.getElementById("drawerResultText"),
+  phoneToggle: document.getElementById("phoneToggle"),
+  searchName: document.getElementById("searchName"),
+  searchSecond: document.getElementById("searchSecond"),
+  searchAddress: document.getElementById("searchAddress"),
+  drawerList: document.getElementById("drawerList")
+  ,
+  archiveModal: document.getElementById("archiveModal"),
+  archiveTitle: document.getElementById("archiveTitle"),
+  archiveSub: document.getElementById("archiveSub"),
+  archiveBody: document.getElementById("archiveBody")
+};
+
+const identityProfiles = {
+  district_leader: {
+    label: "区医保局领导",
+    userName: "焦主任",
+    unit: "重庆市九龙坡区医保局",
+    roles: ["leader"],
+    levels: ["district", "street", "village"],
+    street: null,
+    village: null
+  },
+  street_leader: {
+    label: "镇街社保所分管医保领导",
+    userName: "李主任",
+    unit: "石桥铺街道社保所",
+    roles: ["leader"],
+    levels: ["street", "village"],
+    street: "石桥铺街道",
+    village: null
+  },
+  village_leader: {
+    label: "村居领导",
+    userName: "张书记",
+    unit: "渝州路社区居委会",
+    roles: ["leader"],
+    levels: ["village"],
+    street: "石桥铺街道",
+    village: "渝州路社区"
+  },
+  grid_worker: {
+    label: "网格员",
+    userName: "周网格员",
+    unit: "渝州路社区第3网格",
+    roles: ["worker"],
+    levels: ["village"],
+    street: "石桥铺街道",
+    village: "渝州路社区"
+  }
+};
+
+function currentProfile() { return identityProfiles[state.identity] || identityProfiles.district_leader; }
+
+function applyPermissionGuard() {
+  const p = currentProfile();
+  if (!p.roles.includes(state.role)) state.role = p.roles[0];
+  if (!p.levels.includes(state.level)) state.level = p.levels[0];
+  if (p.street) state.street = p.street;
+  if (p.village) state.village = p.village;
+  const st = getStreetObj(state.street);
+  if (!st.villages.some(v => v.name === state.village)) state.village = st.villages[0].name;
+}
+
+function getStreetObj(name = state.street) { return data.streets.find(s => s.name === name) || data.streets[0] || { name: "", villages: [] }; }
+function sumNodes(nodes) { return nodes.reduce((a, n) => { a.target += n.target; a.current += n.current; a.residents.push(...n.residents); a.enterprises.push(...n.enterprises); return a; }, { target: 0, current: 0, residents: [], enterprises: [] }); }
+function aggregateStreet(street) { const b = sumNodes(street.villages); return { ...b, name: street.name }; }
+function aggregateDistrict() { const b = sumNodes(data.streets.flatMap(s => s.villages)); return { ...b, name: data.district }; }
+function currentNode() { if (state.level === "district") return aggregateDistrict(); if (state.level === "street") return aggregateStreet(getStreetObj()); const st = getStreetObj(); return st.villages.find(v => v.name === state.village) || st.villages[0]; }
+function ratio(a, b) { return b ? ((a / b) * 100).toFixed(1) : "0.0"; }
+function unitText(v, unit) {
+  const n = Number(v || 0);
+  if ((unit === "人" || unit === "家") && Math.abs(n) >= 100000) {
+    const wan = (n / 10000).toFixed(1);
+    return `<span class="num-wrap"><span class="num-value">${wan}</span><span class="num-unit">万${unit}</span></span>`;
+  }
+  return `<span class="num-wrap"><span class="num-value">${n.toLocaleString()}</span><span class="num-unit">${unit}</span></span>`;
+}
+function computeCoreMetrics(node) {
+  const paidResidents = node.residents.filter(r => r.thisYearPaid);
+  const staffDone = paidResidents.filter(r => r.thisYearType === "职工保").length;
+  const residentDone = paidResidents.filter(r => r.thisYearType !== "职工保").length;
+  const done = staffDone + residentDone;
+  const target = node.target;
+  const pct = ratio(done, target);
+  const staffTarget = Math.round(target * 0.42);
+  const residentTarget = Math.max(target - staffTarget, 0);
+  const gapStaff = Math.max(staffTarget - staffDone, 0);
+  const gapResident = Math.max(residentTarget - residentDone, 0);
+  const gapTotal = Math.max(target - done, 0);
+  return { done, target, pct, staffTarget, residentTarget, staffDone, residentDone, gapStaff, gapResident, gapTotal };
+}
+function residentDoneListByMetric(node) {
+  return node.residents.filter(r => r.thisYearType === "居民保" && r.thisYearPaid);
+}
+
+function renderSelectors() {
+  const p = currentProfile();
+  const levelLabel = { district: "区级", street: "镇街", village: "村居" };
+  const currentY = new Date().getFullYear();
+  const years = [currentY, currentY - 1, currentY - 2, currentY - 3];
+  if (!years.includes(Number(state.insuranceYear))) state.insuranceYear = currentY;
+  els.yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}年度</option>`).join("");
+  els.yearSelect.value = String(state.insuranceYear);
+  els.levelSelect.innerHTML = p.levels.map(l => `<option value="${l}">${levelLabel[l]}</option>`).join("");
+  els.levelSelect.value = state.level;
+
+  const allowedStreets = p.street ? data.streets.filter(s => s.name === p.street) : data.streets;
+  if (!allowedStreets.some(s => s.name === state.street)) state.street = allowedStreets[0].name;
+  els.streetSelect.innerHTML = allowedStreets.map(s => `<option value="${s.name}">${s.name}</option>`).join("");
+  els.streetSelect.value = state.street;
+
+  const st = getStreetObj(state.street);
+  const allowedVillages = p.village ? st.villages.filter(v => v.name === p.village) : st.villages;
+  if (!allowedVillages.some(v => v.name === state.village)) state.village = allowedVillages[0].name;
+  els.villageSelect.innerHTML = allowedVillages.map(v => `<option value="${v.name}">${v.name}</option>`).join("");
+  els.villageSelect.value = state.village;
+
+  els.levelSelect.disabled = p.levels.length === 1;
+  els.streetSelect.disabled = !!p.street;
+  els.villageSelect.disabled = !!p.village;
+  els.viewControls.style.display = p.roles.includes("leader") ? "grid" : "none";
+  els.streetSelect.style.display = state.level === "district" ? "none" : "block";
+  els.villageSelect.style.display = state.level === "village" ? "block" : "none";
+
+  let viewing = "当前查看：";
+  if (state.level === "district") viewing += `${data.district}`;
+  if (state.level === "street") viewing += `${state.street}`;
+  if (state.level === "village") viewing += `${state.street} · ${state.village}`;
+  viewing += ` · ${state.insuranceYear}年度`;
+  els.viewingText.textContent = viewing;
+  els.viewingText.style.display = p.roles.includes("leader") ? "block" : "none";
+}
+
+function renderOverview(node) {
+  const metrics = computeCoreMetrics(node);
+  const done = metrics.done, target = metrics.target, pct = metrics.pct;
+
+
+  const staffTarget = metrics.staffTarget;
+  const residentTarget = metrics.residentTarget;
+  const staffDone = metrics.staffDone;
+  const residentDone = metrics.residentDone;
+  const insuredResidents = Math.max(node.residents.filter(r => r.thisYearPaid).length, 1);
+  const stockInsRaw = node.residents.filter(r => r.lastYearPaid && r.thisYearPaid).length;
+  const residentStockDone = Math.round(residentDone * (stockInsRaw / insuredResidents));
+  const residentIncrementDone = Math.max(residentDone - residentStockDone, 0);
+  const gapStaff = metrics.gapStaff;
+  const gapResident = metrics.gapResident;
+  const gapTotal = metrics.gapTotal;
+  const gapDecreaseDay = gapTotal === 0 ? 0 : Math.max(1, Math.round(gapTotal * 0.08));
+  const mobilizeStock = node.residents.filter(r => isStockMobilizableResident(r)).length;
+  const mobilizeIncrement = node.residents.filter(r => isIncrementPotentialResident(r) && r.household === "本区户籍").length;
+  const mobilizeTotal = mobilizeStock + mobilizeIncrement;
+  const gapTip = mobilizeTotal >= gapResident
+    ? `机会评估：可动员${unitText(mobilizeTotal, "人")}，高于居民保差距${unitText(gapResident, "人")}，任务仍有完成机会。`
+    : `风险评估：可动员${unitText(mobilizeTotal, "人")}，低于居民保差距${unitText(gapResident, "人")}，任务完成存在风险。`;
+  const staffDoneRate = ratio(staffDone, Math.max(staffTarget, 1));
+  const residentDoneRate = ratio(residentDone, Math.max(residentTarget, 1));
+  const staffTargetShare = ratio(staffTarget, Math.max(target, 1));
+  const residentTargetShare = ratio(residentTarget, Math.max(target, 1));
+  const staffGapShare = ratio(gapStaff, Math.max(staffTarget, 1));
+  const residentGapShare = ratio(gapResident, Math.max(residentTarget, 1));
+
+
+
+
+
+
+
+  els.overviewCards.innerHTML = `
+        <div class="overview-hero span-2 no-drill">
+          <div class="hero-top">
+            <div class="label">核心指标概览</div>
+            <div class="mini">完成率仪表盘</div>
+          </div>
+          <div class="gauge-row">
+            <div class="gauge-card clickable" data-drill="progress">
+              <div class="gauge-label">总完成率</div>
+              <div class="mini-ring" style="--p:${Math.min(Number(pct), 100)}"><b class="pct-highlight warn">${pct}%</b></div>
+            </div>
+            <div class="gauge-card clickable" data-drill="staff_done">
+              <div class="gauge-label">职工保完成率</div>
+              <div class="mini-ring" style="--p:${Math.min(Number(staffDoneRate), 100)}"><b class="pct-highlight ok">${staffDoneRate}%</b></div>
+            </div>
+            <div class="gauge-card clickable" data-drill="resident_done">
+              <div class="gauge-label">居民保完成率</div>
+              <div class="mini-ring" style="--p:${Math.min(Number(residentDoneRate), 100)}"><b class="pct-highlight">${residentDoneRate}%</b></div>
+            </div>
+          </div>
+          <div class="sketch-stack">
+            <div class="sketch-block">
+              <div class="sketch-head">
+                <div class="sketch-title">参保目标总人数</div>
+              </div>
+              <div class="sketch-body">
+                <div class="sketch-main clickable" data-drill="target_all">
+                  <div class="main-value">${unitText(target, "人")}</div>
+                  <div class="main-sub">占比 100%</div>
+                </div>
+                <div class="sketch-lines">
+                  <div class="sketch-line">
+                    <span class="line-only">其中：</span>
+                    <span class="line-head">占比</span>
+                  </div>
+                  <div class="sketch-line">
+                    <span class="line-label">职工保</span>
+                    <span class="line-value" data-drill="target_staff">${unitText(staffTarget, "人")} <span class="line-rate pct-highlight warn">${staffTargetShare}%</span></span>
+                  </div>
+                  <div class="sketch-line">
+                    <span class="line-label">居民保</span>
+                    <span class="line-value" data-drill="target_resident">${unitText(residentTarget, "人")} <span class="line-rate pct-highlight">${residentTargetShare}%</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="sketch-block">
+              <div class="sketch-head">
+                <div class="sketch-title">已完成参保人数</div>
+              </div>
+              <div class="sketch-body">
+                <div class="sketch-main clickable allow-drill" data-drill="done_all">
+                  <div class="main-value">${unitText(done, "人")}</div>
+                  <div class="main-sub">完成率 ${pct}%</div>
+                </div>
+                <div class="sketch-lines">
+                  <div class="sketch-line">
+                    <span class="line-only">其中：</span>
+                    <span class="line-head">完成率</span>
+                  </div>
+                  <div class="sketch-line">
+                    <span class="line-label">职工保</span>
+                    <span class="line-value allow-drill" data-drill="staff_done">${unitText(staffDone, "人")} <span class="line-rate pct-highlight ok">${staffDoneRate}%</span></span>
+                  </div>
+                  <div class="sketch-line">
+                    <span class="line-label">居民保</span>
+                    <span class="line-value allow-drill" data-drill="resident_done">${unitText(residentDone, "人")} <span class="line-rate pct-highlight ok">${residentDoneRate}%</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="sketch-block">
+              <div class="sketch-head">
+                <div class="sketch-title">目标差距</div>
+              </div>
+              <div class="sketch-body">
+                <div class="sketch-main clickable warn" data-drill="need_mobilize">
+                  <div class="main-value">${unitText(gapTotal, "人")}</div>
+                  <div class="main-sub">较昨日减少 ${unitText(gapDecreaseDay, "人")}</div>
+                </div>
+                <div class="sketch-lines">
+                  <div class="sketch-line">
+                    <span class="line-only">其中：</span>
+                    <span class="line-head">差距率</span>
+                  </div>
+                  <div class="sketch-line">
+                    <span class="line-label">职工保</span>
+                    <span class="line-value gap-alert" data-drill="gap_staff">${unitText(gapStaff, "人")} <span class="line-rate pct-highlight warn">${staffGapShare}%</span></span>
+                  </div>
+                  <div class="sketch-line">
+                    <span class="line-label">居民保</span>
+                    <span class="line-value gap-alert" data-drill="gap_resident">${unitText(gapResident, "人")} <span class="line-rate pct-highlight warn">${residentGapShare}%</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="sketch-block">
+              <div class="sketch-head">
+                <div class="sketch-title">居民保可动员人数</div>
+              </div>
+              <div class="sketch-body">
+                <div class="sketch-main clickable allow-drill" data-drill="mobilize_total">
+                  <div class="main-value">${unitText(mobilizeTotal, "人")}</div>
+                  <div class="main-sub">与居民保差距联动评估</div>
+                </div>
+                <div class="sketch-lines">
+                  <div class="sketch-line">
+                    <span class="line-only">其中：</span>
+                    <span></span>
+                  </div>
+                  <div class="sketch-line">
+                    <span class="line-label">存量可动员</span>
+                    <span class="line-value allow-drill" data-drill="mobilize_stock">${unitText(mobilizeStock, "人")}</span>
+                  </div>
+                  <div class="sketch-line">
+                    <span class="line-label">增量可动员</span>
+                    <span class="line-value allow-drill" data-drill="mobilize_increment">${unitText(mobilizeIncrement, "人")}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="sketch-risk-note ${mobilizeTotal >= gapResident ? "" : "warn"}">${gapTip}</div>
+          </div>
+        </div>`;
+  // 核心指标概览默认不穿透，仅“已完成参保人数”3个数值支持穿透
+  els.overviewCards.querySelectorAll("[data-drill].allow-drill").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+}
+
+function renderMap() {
+  let childNodes = [];
+  if (state.level === "district") childNodes = data.streets.map(s => aggregateStreet(s));
+  else if (state.level === "street") childNodes = getStreetObj().villages;
+  else {
+    els.mapPanel.innerHTML = `<div class="module-head"><span class="module-title">区域参保情况排名</span><span class="module-link">村居无下级</span></div><div class="mini">村居层级无下级单位，可切换到镇街/区级查看下级排名。</div>`;
+    return;
+  }
+
+  const metricOf = (n) => {
+    const totalTarget = n.target;
+    const paidResidents = n.residents.filter(r => r.thisYearPaid);
+    const totalDone = paidResidents.length;
+    const staffTarget = Math.round(totalTarget * 0.42);
+    const residentTarget = Math.max(totalTarget - staffTarget, 0);
+    const staffDone = paidResidents.filter(r => r.thisYearType === "职工保").length;
+    const residentDone = paidResidents.filter(r => r.thisYearType === "居民保").length;
+    const totalRate = Number(ratio(totalDone, Math.max(totalTarget, 1)));
+    const staffRate = Number(ratio(staffDone, Math.max(staffTarget, 1)));
+    const residentRate = Number(ratio(residentDone, Math.max(residentTarget, 1)));
+    return { name: n.name, totalTarget, totalDone, totalRate, staffTarget, staffDone, staffRate, residentTarget, residentDone, residentRate };
+  };
+
+  let list = childNodes.map(metricOf);
+  const sortField = state.areaRankSort === "staff" ? "staffRate" : (state.areaRankSort === "resident" ? "residentRate" : "totalRate");
+  list.sort((a, b) => b[sortField] - a[sortField]);
+  const visible = state.areaRankExpanded ? list : list.slice(0, 3);
+  const levelLabel = state.level === "district" ? "镇街" : "村居";
+  const sortLabel = state.areaRankSort === "staff" ? "职工保完成率" : (state.areaRankSort === "resident" ? "居民保完成率" : "总参保任务完成率");
+
+  const row = (name, metric, key, unitName, allowDrill = false) =>
+    `<span class="area-rank-v ${allowDrill ? "allow-drill" : ""}" data-drill="area|${unitName}|${key}">${unitText(metric, "人")}</span>`;
+
+  const renderStaffCell = (x) => `
+        <td>
+            <div class="metric-cell">
+            <div class="metric-line">任务${row("职工任务", x.staffTarget, "target_staff", x.name)}</div>
+            <div class="metric-line">完成${row("职工完成", x.staffDone, "staff_done", x.name, true)}</div>
+            <div class="metric-rate">完成率 ${x.staffRate.toFixed(1)}%</div>
+          </div>
+        </td>`;
+  const renderResidentCell = (x) => `
+        <td>
+            <div class="metric-cell">
+            <div class="metric-line">任务${row("居民任务", x.residentTarget, "target_resident", x.name)}</div>
+            <div class="metric-line">完成${row("居民完成", x.residentDone, "resident_done", x.name, true)}</div>
+            <div class="metric-rate">完成率 ${x.residentRate.toFixed(1)}%</div>
+          </div>
+        </td>`;
+  const renderTotalCell = (x) => `
+        <td>
+            <div class="metric-cell">
+            <div class="metric-line">任务${row("总任务", x.totalTarget, "target_all", x.name)}</div>
+            <div class="metric-line">完成${row("总完成", x.totalDone, "done_all", x.name, true)}</div>
+            <div class="metric-rate">完成率 ${x.totalRate.toFixed(1)}%</div>
+          </div>
+        </td>`;
+  const metricOrder = state.areaRankSort === "staff"
+    ? ["staff", "total", "resident"]
+    : (state.areaRankSort === "resident" ? ["resident", "total", "staff"] : ["total", "staff", "resident"]);
+  const metricLabel = { total: "总参保", staff: "职工保", resident: "居民保" };
+  const renderMetricCell = (key, x) => (key === "total" ? renderTotalCell(x) : (key === "staff" ? renderStaffCell(x) : renderResidentCell(x)));
+
+  els.mapPanel.innerHTML = `
+        <div class="area-rank-head">
+          <div class="module-title">下级${levelLabel}参保完成情况排名</div>
+          <button class="btn-mini" id="areaExpandBtn">${state.areaRankExpanded ? "收起" : "展开全部"}</button>
+        </div>
+        <div class="area-rank-sort">
+          <button class="sort-chip ${state.areaRankSort === "total" ? "active" : ""}" data-sort="total">按总完成率</button>
+          <button class="sort-chip ${state.areaRankSort === "staff" ? "active" : ""}" data-sort="staff">按职工保完成率</button>
+          <button class="sort-chip ${state.areaRankSort === "resident" ? "active" : ""}" data-sort="resident">按居民保完成率</button>
+        </div>
+        <div class="mini">当前排序：${sortLabel} · 默认展示前3名</div>
+        <div class="area-table-wrap no-drill">
+          <table class="area-table">
+            <thead>
+              <tr>
+                <th>排名 / 单位</th>
+                <th>${metricLabel[metricOrder[0]]}</th>
+                <th>${metricLabel[metricOrder[1]]}</th>
+                <th>${metricLabel[metricOrder[2]]}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${visible.map((x, i) => `
+              <tr>
+                <td>
+                  <div class="area-rank-no">第 ${i + 1} 名</div>
+                  <div class="area-unit">${x.name}</div>
+                  <span class="area-rate-pill">${x[sortField].toFixed(1)}%</span>
+                </td>
+                ${renderMetricCell(metricOrder[0], x)}
+                ${renderMetricCell(metricOrder[1], x)}
+                ${renderMetricCell(metricOrder[2], x)}
+              </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+  els.mapPanel.querySelectorAll("[data-sort]").forEach(el => el.onclick = () => { state.areaRankSort = el.dataset.sort; render(); });
+  const expBtn = document.getElementById("areaExpandBtn");
+  if (expBtn) expBtn.onclick = () => { state.areaRankExpanded = !state.areaRankExpanded; render(); };
+  // 区域参保情况排名仅“完成人数”支持穿透
+  els.mapPanel.querySelectorAll("[data-drill].allow-drill").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+}
+
+function renderStock(node) {
+  const residents = node.residents;
+  const stockTotal = residents.filter(r => r.lastYearLocalPaid).length;
+  const stockInsured = residents.filter(r => r.lastYearLocalPaid && r.stockChangeType === "存量续保").length;
+  const retained = stockInsured;
+  const loss = residents.filter(r => r.lastYearLocalPaid && ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"].includes(r.stockChangeType)).length;
+  const movableStockUnpaid = residents.filter(r => r.lastYearLocalPaid && r.stockChangeType === "可动员").length;
+  const newPay = residents.filter(r => ((!r.lastYearPaid) || (r.lastYearPaid && !r.lastYearLocalPaid)) && r.thisYearPaid && r.insuredPlace === "本区县参保").length;
+  const possibleInc = residents.filter(r => r.household === "本区户籍" && !r.thisYearPaid && ((!r.lastYearPaid) || (r.lastYearPaid && !r.lastYearLocalPaid))).length;
+  els.stockPanel.innerHTML = `
+        <div class="module-head"><span class="module-title">存量与增量双线跟踪（居民保）</span><span class="module-link">点击穿透</span></div>
+        <div class="stock-group">
+          <div class="stock-group-title">存量情况分析</div>
+          <div class="metric-row" data-drill="stock_total"><div><div class="label">存量总数</div><div class="mini">去年在本辖区参保基数</div></div><div><b>${unitText(stockTotal, "人")}</b><span class="arrow">›</span></div></div>
+          <div class="metric-row" data-drill="stock_insured"><div><div class="label">存量已参保（存量巩固/续保）</div><div class="mini">占比 <span class="pct-highlight">${ratio(stockInsured, Math.max(stockTotal, 1))}%</span></div></div><div><b>${unitText(stockInsured, "人")}</b><span class="arrow">›</span></div></div>
+          <div class="metric-row" data-drill="stock_uninsured"><div><div class="label">存量未参保（可动员）</div><div class="mini">去年存量到现在还没参保，可继续动员</div></div><div><b>${unitText(movableStockUnpaid, "人")}</b><span class="arrow">›</span></div></div>
+          <div class="metric-row" data-drill="stock_loss"><div><div class="label">存量减员（已确认）</div><div class="mini">死亡/辖区外参保/停保/转职工保（含灵活就业参保）</div></div><div><b><span class="gap-num">${unitText(loss, "人")}</span></b><span class="arrow">›</span></div></div>
+        </div>
+        <div class="stock-group">
+          <div class="stock-group-title">增量情况分析</div>
+          <div class="metric-row" data-drill="increment_new"><div><div class="label">新增参保（扩面）</div><div class="mini">去年未参保或在辖区外参保，今年在辖区内参保</div></div><div><b><span class="pct-highlight ok">${unitText(newPay, "人")}</span></b><span class="arrow">›</span></div></div>
+          <div class="metric-row" data-drill="increment_potential"><div><div class="label">可扩增量（优先）</div><div class="mini">去年未参保或在辖区外参保，今年尚未参保的本区户籍不论是否居住本区</div></div><div><b>${unitText(possibleInc, "人")}</b><span class="arrow">›</span></div></div>
+        </div>`;
+  els.stockPanel.querySelectorAll(".metric-row").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+}
+
+function renderStructure(node) {
+  const total = node.residents.length;
+  const male = node.residents.filter(r => r.gender === "男").length;
+  const female = total - male;
+  const ageGroups = [
+    { label: "16岁及以下", list: node.residents.filter(r => r.ageGroup === "16岁及以下") },
+    { label: "16-30岁", list: node.residents.filter(r => r.ageGroup === "16-30岁") },
+    { label: "31-45岁", list: node.residents.filter(r => r.ageGroup === "31-45岁") },
+    { label: "46-60岁", list: node.residents.filter(r => r.ageGroup === "46-60岁") },
+    { label: "60岁以上", list: node.residents.filter(r => r.ageGroup === "60岁以上") }
+  ];
+  const ageDetail = ageGroups.map((a, i) => {
+    const m = a.list.filter(r => r.gender === "男").length;
+    const f = a.list.length - m;
+    const insured = a.list.filter(r => r.thisYearPaid).length;
+    return { label: a.label, count: a.list.length, m, f, insureRate: ratio(insured, Math.max(a.list.length, 1)), share: ratio(a.list.length, Math.max(total, 1)), color: i === 1 ? "#3b82f6" : "#10b981" };
+  });
+
+  els.structurePanel.innerHTML = `
+        <div class="module-head"><span class="module-title">年龄与性别分析</span><span class="module-link">维度穿透</span></div>
+        <div class="mini">性别结构</div>
+        <div class="pill-row">
+          <div class="pill clickable" data-drill="gender_male"><span>男</span><b>${ratio(male, total)}% · ${unitText(male, "人")}</b></div>
+          <div class="pill female clickable" data-drill="gender_female"><span>女</span><b>${ratio(female, total)}% · ${unitText(female, "人")}</b></div>
+        </div>
+        <div class="mini" style="margin-top:10px">年龄分析（总人数、占比、参保率）</div>
+        <div class="age-analysis">
+          ${ageDetail.map(a => `
+            <div class="age-item clickable" data-drill="age_${a.label}">
+              <div class="age-head">
+                <div class="age-title">${a.label}<span class="age-share">占比 ${a.share}%</span></div>
+                <div class="age-stats"><div class="age-total">${unitText(a.count, "人")}</div><div class="age-rate">${a.insureRate}%</div></div>
+              </div>
+              <div class="progress"><span style="width:${a.share}%;background:${a.color}"></span></div>
+              <div class="age-meta">
+                <div class="m clickable" data-drill="age_gender|${a.label}|男">男: ${unitText(a.m, "人")}</div>
+                <div class="f clickable" data-drill="age_gender|${a.label}|女">女: ${unitText(a.f, "人")}</div>
+              </div>
+            </div>`).join("")}
+        </div>`;
+  els.structurePanel.querySelectorAll(".clickable").forEach(el => {
+    el.onclick = (e) => {
+      if (el.closest(".age-meta")) e.stopPropagation();
+      openDrawer(el.dataset.drill);
+    };
+  });
+}
+
+function renderHousehold(node) {
+  const rs = node.residents;
+  const local = rs.filter(r => r.household === "本区户籍");
+  const localIns = local.filter(r => r.thisYearPaid);
+  const localUn = local.filter(r => !r.thisYearPaid);
+  const nonlocalLive = rs.filter(r => r.household === "非本区户籍" && r.residenceDetail === "本辖区");
+  const nonlocalLiveIns = nonlocalLive.filter(r => r.thisYearPaid);
+  const nonlocalLiveUn = nonlocalLive.filter(r => !r.thisYearPaid);
+  const v = (n, t) => `<span class="hh-value" data-drill="${n.key}">${unitText(n.count, "人")} <span class="pct-highlight">${ratio(n.count, Math.max(t, 1))}%</span></span>`;
+  const bar = (count, total, cls = "") => `<div class="hh-track"><span class="hh-fill ${cls}" style="width:${ratio(count, Math.max(total, 1))}%"></span></div>`;
+
+  const dim2 = [
+    { key: "hh_local_insured_local", label: "本区县参保", count: localIns.filter(r => r.insuredPlace === "本区县参保").length, cls: "ok" },
+    { key: "hh_local_insured_city_other", label: "市内外区参保", count: localIns.filter(r => r.insuredPlace === "市内外区参保").length, cls: "" },
+    { key: "hh_local_insured_outcity", label: "市外参保", count: localIns.filter(r => r.insuredPlace === "市外参保").length, cls: "warn" }
+  ];
+  const dim3 = [
+    { key: "hh_local_uninsured_res_local", label: "居住本辖区", count: localUn.filter(r => r.residenceDetail === "本辖区").length, cls: "ok" },
+    { key: "hh_local_uninsured_res_district_other", label: "居住区内其他辖区", count: localUn.filter(r => r.residenceDetail === "区内其他辖区").length, cls: "" },
+    { key: "hh_local_uninsured_res_city_other", label: "居住市内外区", count: localUn.filter(r => r.residenceDetail === "市内外区").length, cls: "warn" },
+    { key: "hh_local_uninsured_res_outcity", label: "居住市外", count: localUn.filter(r => r.residenceDetail === "市外").length, cls: "slate" }
+  ];
+
+  els.householdPanel.innerHTML = `
+        <div class="module-head"><span class="module-title">户籍参保结构四维分析</span><span class="module-link">数字可穿透</span></div>
+        <div class="hh-grid">
+          <div class="hh-card">
+            <div class="hh-title-row">
+              <div class="hh-title">1. 辖区户籍总人口</div>
+              <span class="hh-value" data-drill="hh_local_total">${unitText(local.length, "人")}</span>
+            </div>
+            <div class="hh-bars">
+              <div><div class="hh-row"><span class="hh-label">已参保</span>${v({ key: "hh_local_insured", count: localIns.length }, local.length)}</div>${bar(localIns.length, local.length, "ok")}</div>
+              <div><div class="hh-row"><span class="hh-label">未参保</span>${v({ key: "hh_local_uninsured", count: localUn.length }, local.length)}</div>${bar(localUn.length, local.length, "warn")}</div>
+            </div>
+          </div>
+
+          <div class="hh-card">
+            <div class="hh-title-row">
+              <div class="hh-title">2. 已参保户籍人口去向</div>
+              <span class="hh-value" data-drill="hh_local_insured">${unitText(localIns.length, "人")}</span>
+            </div>
+            <div class="hh-bars">${dim2.map(x => `<div><div class="hh-row"><span class="hh-label">${x.label}</span>${v({ key: x.key, count: x.count }, localIns.length)}</div>${bar(x.count, localIns.length, x.cls)}</div>`).join("")}</div>
+          </div>
+
+          <div class="hh-card">
+            <div class="hh-title-row">
+              <div class="hh-title">3. 未参保户籍人口居住分布</div>
+              <span class="hh-value" data-drill="hh_local_uninsured">${unitText(localUn.length, "人")}</span>
+            </div>
+            <div class="hh-bars">${dim3.map(x => `<div><div class="hh-row"><span class="hh-label">${x.label}</span>${v({ key: x.key, count: x.count }, localUn.length)}</div>${bar(x.count, localUn.length, x.cls)}</div>`).join("")}</div>
+          </div>
+
+          <div class="hh-card">
+            <div class="hh-title-row">
+              <div class="hh-title">4. 辖区非户籍居住总人口</div>
+              <span class="hh-value" data-drill="hh_nonlocal_live_total">${unitText(nonlocalLive.length, "人")}</span>
+            </div>
+            <div class="hh-bars">
+              <div><div class="hh-row"><span class="hh-label">已参保</span>${v({ key: "hh_nonlocal_live_insured", count: nonlocalLiveIns.length }, nonlocalLive.length)}</div>${bar(nonlocalLiveIns.length, nonlocalLive.length, "ok")}</div>
+              <div><div class="hh-row"><span class="hh-label">未参保</span>${v({ key: "hh_nonlocal_live_uninsured", count: nonlocalLiveUn.length }, nonlocalLive.length)}</div>${bar(nonlocalLiveUn.length, nonlocalLive.length, "warn")}</div>
+            </div>
+          </div>
+        </div>`;
+  els.householdPanel.querySelectorAll("[data-drill]").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+}
+
+function renderKey(node) {
+  const groups = [
+    { key: "新生儿", label: "新生儿", desc: "当年出生0~1岁", list: node.residents.filter(r => r.age >= 0 && r.age <= 1) },
+    { key: "中小学生", label: "中小学生", desc: "6~18岁在校中小学生", list: node.residents.filter(r => r.age >= 6 && r.age <= 18 && r.isPrimarySecondary) },
+    { key: "高校生", label: "高校生", desc: "16~30岁在校高校生（含大中专）", list: node.residents.filter(r => r.age >= 16 && r.age <= 30 && r.isCollege) },
+    { key: "资助对象", label: "资助对象", desc: "低保户、残疾等困难居民", list: node.residents.filter(r => r.isHardship) }
+  ].map(g => {
+    const total = g.list.length;
+    const insured = g.list.filter(r => r.thisYearPaid).length;
+    const uninsured = total - insured;
+    return { ...g, total, insured, uninsured, insuredRate: ratio(insured, Math.max(total, 1)), uninsuredRate: ratio(uninsured, Math.max(total, 1)) };
+  });
+
+  els.keyPanel.innerHTML = `<div class="module-head"><span class="module-title">重点人群分布</span><span class="module-link">按类型穿透</span></div>` + groups.map(g => `
+        <div class="metric-row" data-drill="key_${g.key}">
+          <div>
+            <div class="key-desc-line"><span class="name">${g.label}</span><span class="desc">- ${g.desc}</span></div>
+            <div class="key-stats">
+              <span class="key-stat insured" data-drill="key_insured_${g.key}"><div class="t1">已参保</div><div class="t2">${unitText(g.insured, "人")} · 占比 ${g.insuredRate}%</div></span>
+              <span class="key-stat uninsured" data-drill="key_uninsured_${g.key}"><div class="t1">未参保</div><div class="t2">${unitText(g.uninsured, "人")} · 占比 ${g.uninsuredRate}%</div></span>
+            </div>
+          </div>
+          <div><span class="key-total">总人数</span><b>${unitText(g.total, "人")}</b><span class="arrow">›</span></div>
+        </div>`).join("");
+  els.keyPanel.querySelectorAll(".metric-row").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+  els.keyPanel.querySelectorAll(".key-stat").forEach(el => el.onclick = (e) => { e.stopPropagation(); openDrawer(el.dataset.drill); });
+}
+
+function renderLoss(node) {
+  const loss = node.residents.filter(r => r.lastYearLocalPaid && ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"].includes(r.stockChangeType));
+  const reasons = ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"];
+  els.lossPanel.innerHTML = `<div class="module-head"><span class="module-title">居民保存量减员原因拆解</span><span class="module-link">原因追踪</span></div>` + reasons.map(r => `<div class="metric-row" data-drill="loss_${r}"><div><div class="label">${r}</div><div class="mini">存量减员原因</div></div><div><b>${unitText(loss.filter(x => x.lossReason === r).length, "人")}</b><span class="arrow">›</span></div></div>`).join("");
+  els.lossPanel.querySelectorAll(".metric-row").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+}
+
+function renderRisk(node) {
+  const high = node.enterprises.filter(e => e.risk === "高").length;
+  const medium = node.enterprises.filter(e => e.risk === "中").length;
+  const flow1 = node.residents.filter(r => r.pauseFlow === "转居民保").length;
+  const flow2 = node.residents.filter(r => r.pauseFlow === "申请停保").length;
+  const flow3 = node.residents.filter(r => r.pauseFlow === "跨区转出").length;
+  els.riskPanel.innerHTML = `
+        <div class="module-head"><span class="module-title">风险预警任务</span><span class="module-link">企业穿透</span></div>
+        <div class="risk-card high" data-drill="risk_high"><div class="risk-title">高风险 ${unitText(high, "家")} 企业</div><div class="risk-desc">欠费/断缴超3个月、参保差异率≥20%、缴费基数做实率<80%</div></div>
+        <div class="risk-card" data-drill="risk_medium"><div class="risk-title">中风险 ${unitText(medium, "家")} 企业</div><div class="risk-desc">参保登记未缴费、欠费3个月内、灵活就业近30天未缴</div></div>
+        <div class="flow-wrap">
+          <div class="flow-item c1" data-drill="flow_resident">转居民保 <span class="flow-num">${flow1}</span> 人</div>
+          <div class="flow-item c2" data-drill="flow_pause">申请停保 <span class="flow-num">${flow2}</span> 人</div>
+          <div class="flow-item c3" data-drill="flow_transfer">跨区转出 <span class="flow-num">${flow3}</span> 人</div>
+        </div>`;
+  els.riskPanel.querySelectorAll("[data-drill]").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+}
+
+function renderStaff(node) {
+  const detailDefs = [
+    { key: "在职职工", big: "单位参保", mode: "staff_detail_onjob" },
+    { key: "单位退休人员", big: "单位参保", mode: "staff_detail_org_retired" },
+    { key: "灵活就业（一档）", big: "个人参保（灵活就业）", mode: "staff_detail_flex_1" },
+    { key: "灵活就业（二档）", big: "个人参保（灵活就业）", mode: "staff_detail_flex_2" },
+    { key: "个人退休（一档）", big: "个人参保（灵活就业）", mode: "staff_detail_person_retired_1" },
+    { key: "个人退休（二档）", big: "个人参保（灵活就业）", mode: "staff_detail_person_retired_2" }
+  ];
+  // 统一口径：全部基于“明细数据”实时聚合，确保卡片数值与穿透条数一致
+  const staffResidents = node.residents.filter(r => r.thisYearType === "职工保");
+  const totalStaffPeople = staffResidents.length;
+  const detailStats = detailDefs.map(d => ({
+    ...d,
+    count: staffResidents.filter(r => r.staffDetailType === d.key).length
+  }));
+  const onJobCount = detailStats.find(d => d.key === "在职职工")?.count || 0;
+  const orgRetiredCount = detailStats.find(d => d.key === "单位退休人员")?.count || 0;
+  const byBig = {
+    unit: staffResidents.filter(r => r.staffBigType === "单位参保").length,
+    personal: staffResidents.filter(r => r.staffBigType === "个人参保（灵活就业）").length
+  };
+
+  const unitsTotal = node.enterprises.length;
+  const unitsInsured = node.enterprises.filter(e => e.staffInsured).length;
+  const unitsUninsured = Math.max(unitsTotal - unitsInsured, 0);
+  const unitsInsuredLastMonth = node.enterprises.filter(e => e.lastMonthStaffInsured).length;
+  const unitsUninsuredLastMonth = Math.max(unitsTotal - unitsInsuredLastMonth, 0);
+  const mom = (cur, prev) => `${cur >= prev ? "+" : ""}${(prev ? ((cur - prev) * 100 / prev) : 0).toFixed(1)}%`;
+  const momCls = (cur, prev) => (cur - prev) < 0 ? "pct-highlight neg" : "pct-highlight";
+  const byBigSplit = Number(ratio(byBig.unit, Math.max(totalStaffPeople, 1)));
+  const unitSubTotal = Math.max(onJobCount + orgRetiredCount, 1);
+  const unitSubSplit = Number(ratio(onJobCount, unitSubTotal));
+
+  els.staffPanel.innerHTML = `
+        <div class="module-head"><span class="module-title">职工参保人员与参保单位双维分析</span><span class="module-link">数字可穿透</span></div>
+        <div class="staff-block">
+          <div class="staff-subtitle">1. 参保职工分布（大类+细类）</div>
+          <div class="metric-row" data-drill="staff_people_all"><div><div class="label">职工参保总人数</div></div><div><b>${unitText(totalStaffPeople, "人")}</b><span class="arrow">›</span></div></div>
+          <div class="staff-pies">
+            <div class="staff-pie-card">
+              <div class="staff-pie-title">单位参保 vs 个人参保（灵活就业）</div>
+              <div class="staff-pie" style="--seg:${byBigSplit};--c1:#3b82f6;--c2:#10b981;"></div>
+              <div class="staff-pie-legend">
+                <div class="staff-pie-item" data-drill="staff_big_unit"><span class="left"><span class="dot c1"></span><span class="k">单位参保</span></span><span class="v">${unitText(byBig.unit, "人")} <span class="pct-highlight">${ratio(byBig.unit, Math.max(totalStaffPeople, 1))}%</span></span></div>
+                <div class="staff-pie-item" data-drill="staff_big_personal"><span class="left"><span class="dot c2"></span><span class="k">个人参保</span></span><span class="v">${unitText(byBig.personal, "人")} <span class="pct-highlight">${ratio(byBig.personal, Math.max(totalStaffPeople, 1))}%</span></span></div>
+              </div>
+            </div>
+            <div class="staff-pie-card">
+              <div class="staff-pie-title">单位参保内部：在职 vs 单位退休</div>
+              <div class="staff-pie" style="--seg:${unitSubSplit};--c1:#2563eb;--c2:#f59e0b;"></div>
+              <div class="staff-pie-legend">
+                <div class="staff-pie-item" data-drill="staff_detail_onjob"><span class="left"><span class="dot c1"></span><span class="k">在职职工</span></span><span class="v">${unitText(onJobCount, "人")} <span class="pct-highlight">${ratio(onJobCount, unitSubTotal)}%</span></span></div>
+                <div class="staff-pie-item" data-drill="staff_detail_org_retired"><span class="left"><span class="dot c3"></span><span class="k">单位退休人员</span></span><span class="v">${unitText(orgRetiredCount, "人")} <span class="pct-highlight">${ratio(orgRetiredCount, unitSubTotal)}%</span></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="staff-grid two" style="margin-top:8px">
+            ${detailStats.filter(d => !["在职职工", "单位退休人员"].includes(d.key)).map(d => `<div class="staff-chip" data-drill="${d.mode}"><div class="k">${d.key}</div><div class="mini">${d.big}</div><div class="v">${unitText(d.count, "人")} <span class="pct-highlight">${ratio(d.count, Math.max(totalStaffPeople, 1))}%</span></div></div>`).join("")}
+          </div>
+        </div>
+        <div class="staff-block">
+          <div class="staff-subtitle">2. 参保单位分布</div>
+          <div class="metric-row" data-drill="staff_unit_total"><div><div class="label">全辖区单位总数</div></div><div><b>${unitText(unitsTotal, "家")}</b><span class="arrow">›</span></div></div>
+          <div class="staff-grid two" style="margin-top:8px">
+            <div class="staff-chip" data-drill="staff_unit_insured">
+              <div class="k">参加职工保单位</div>
+              <div class="v">${unitText(unitsInsured, "家")} <span class="pct-highlight">${ratio(unitsInsured, Math.max(unitsTotal, 1))}%</span></div>
+              <div class="trend-note"><span class="trend-label">环比</span><span class="${momCls(unitsInsured, unitsInsuredLastMonth)}">${mom(unitsInsured, unitsInsuredLastMonth)}</span></div>
+            </div>
+            <div class="staff-chip" data-drill="staff_unit_uninsured">
+              <div class="k">未参加职工保单位</div>
+              <div class="v">${unitText(unitsUninsured, "家")} <span class="pct-highlight warn">${ratio(unitsUninsured, Math.max(unitsTotal, 1))}%</span></div>
+              <div class="trend-note"><span class="trend-label">环比</span><span class="${momCls(unitsUninsured, unitsUninsuredLastMonth)}">${mom(unitsUninsured, unitsUninsuredLastMonth)}</span></div>
+            </div>
+          </div>
+        </div>`;
+  els.staffPanel.querySelectorAll("[data-drill]").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+}
+
+function renderWorker(node) {
+  const metrics = computeCoreMetrics(node);
+  const residentTarget = metrics.residentTarget;
+  const residentDone = metrics.residentDone;
+  const diff = metrics.gapResident;
+  const pct = ratio(residentDone, residentTarget);
+  const yesterdayAdded = Math.max(0, Math.round(residentDone * 0.012));
+  const updateAt = new Date().toLocaleString("zh-CN", { hour12: false });
+
+  const stockUnpaidList = node.residents.filter(r => isStockMobilizableResident(r));
+  const incrementPotentialList = node.residents.filter(r => isIncrementPotentialResident(r));
+  const mobilizableCount = stockUnpaidList.length + incrementPotentialList.length;
+  const workerWarn = mobilizableCount < diff;
+
+  const byRel = (list) => {
+    const a = list.filter(r => r.household === "本区户籍" && r.residence === "本区居住").length;
+    const b = list.filter(r => r.household === "本区户籍" && r.residence !== "本区居住").length;
+    const c = list.filter(r => r.household !== "本区户籍" && r.residence === "本区居住").length;
+    const d = list.filter(r => r.household !== "本区户籍" && r.residence !== "本区居住").length;
+    return { a, b, c, d };
+  };
+  const stockRel = byRel(stockUnpaidList);
+  const incRel = byRel(incrementPotentialList);
+
+  const hardshipPending = node.residents.filter(r => r.isHardship && (isStockMobilizableResident(r) || isIncrementPotentialResident(r)));
+  const hardshipTypeList = ["低保对象", "残疾对象", "特困对象"].map(t => ({
+    type: t,
+    count: hardshipPending.filter(r => r.hardshipType === t).length
+  }));
+
+  els.workerOverview.innerHTML = `
+        <div class="module-head span-2"><span class="module-title">村居任务概览</span><span class="module-link">今日更新 ${updateAt}</span></div>
+        <div class="card"><div class="label">本村居目标（居民保）</div><div class="value">${unitText(residentTarget, "人")}</div></div>
+        <div class="card clickable" data-drill="worker_done_resident">
+          <div class="label">已参保（居民保）</div>
+          <div class="value done-value-row">
+            <span class="main-num">${unitText(residentDone, "人")}</span>
+            <span class="add-num">昨日新增 <span class="pct-highlight ok">${unitText(yesterdayAdded, "人")}</span></span>
+          </div>
+        </div>
+        <div class="card"><div class="label">目标差距（居民保）</div><div class="value gap-num">${unitText(diff, "人")}</div></div>
+        <div class="card"><div class="label">完成进度</div><div class="value"><span class="pct-highlight ok">${pct}%</span></div><div class="progress"><span style="width:${Math.min(Number(pct), 100)}%"></span></div></div>`;
+  els.workerOverview.querySelectorAll(".clickable").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+
+  els.workerTodo.innerHTML = `
+        <div class="module-head"><span class="module-title">待动员名单</span><span class="module-link">优先级排序</span></div>
+        <div class="metric-row" data-drill="worker_mobilizable"><div><div class="label">可动员人数</div><div class="mini">存量未参保 + 可增量动员</div></div><div><b>${unitText(mobilizableCount, "人")}</b><span class="arrow">›</span></div></div>
+        ${workerWarn ? `<div class="sketch-risk-note warn">预警提醒：可动员${unitText(mobilizableCount, "人")}，低于目标差距${unitText(diff, "人")}，任务完成存在风险。</div>` : ""}
+
+        <div class="todo-card">
+          <div class="todo-head metric-row" data-drill="worker_stock_unpaid" style="margin-top:0;border:0;background:transparent;padding:0">
+            <div><div class="label">存量未参保（可动员）</div></div>
+            <div><b>${unitText(stockUnpaidList.length, "人")}</b><span class="arrow">›</span></div>
+          </div>
+          <div class="todo-subgrid">
+            <div class="todo-mini" data-drill="stock_hh_local_res_local"><div class="k">户在人在</div><div class="v">${unitText(stockRel.a, "人")} · <span class="pct-highlight">${ratio(stockRel.a, Math.max(stockUnpaidList.length, 1))}%</span></div></div>
+            <div class="todo-mini" data-drill="stock_hh_local_res_other"><div class="k">户在人不在</div><div class="v">${unitText(stockRel.b, "人")} · <span class="pct-highlight">${ratio(stockRel.b, Math.max(stockUnpaidList.length, 1))}%</span></div></div>
+            <div class="todo-mini" data-drill="stock_hh_other_res_local"><div class="k">人在户不在</div><div class="v">${unitText(stockRel.c, "人")} · <span class="pct-highlight">${ratio(stockRel.c, Math.max(stockUnpaidList.length, 1))}%</span></div></div>
+            <div class="todo-mini" data-drill="stock_hh_other_res_other"><div class="k">人户均不在</div><div class="v">${unitText(stockRel.d, "人")} · <span class="pct-highlight">${ratio(stockRel.d, Math.max(stockUnpaidList.length, 1))}%</span></div></div>
+          </div>
+        </div>
+
+        <div class="todo-card">
+          <div class="todo-head metric-row" data-drill="worker_increment_potential" style="margin-top:0;border:0;background:transparent;padding:0">
+            <div><div class="label">可扩增量人员</div></div>
+            <div><b>${unitText(incrementPotentialList.length, "人")}</b><span class="arrow">›</span></div>
+          </div>
+          <div class="todo-subgrid three">
+            <div class="todo-mini" data-drill="inc_hh_local_res_local"><div class="k">户在人在</div><div class="v">${unitText(incRel.a, "人")} · <span class="pct-highlight">${ratio(incRel.a, Math.max(incrementPotentialList.length, 1))}%</span></div></div>
+            <div class="todo-mini" data-drill="inc_hh_local_res_other"><div class="k">户在人不在</div><div class="v">${unitText(incRel.b, "人")} · <span class="pct-highlight">${ratio(incRel.b, Math.max(incrementPotentialList.length, 1))}%</span></div></div>
+            <div class="todo-mini" data-drill="inc_hh_other_res_local"><div class="k">人在户不在</div><div class="v">${unitText(incRel.c, "人")} · <span class="pct-highlight">${ratio(incRel.c, Math.max(incrementPotentialList.length, 1))}%</span></div></div>
+          </div>
+        </div>
+
+        <div class="todo-card">
+          <div class="todo-head metric-row" data-drill="hardship_pending_total" style="margin-top:0;border:0;background:transparent;padding:0">
+            <div><div class="label">重点资助对象（待动员）</div><div class="mini">与存量未参保、可扩增量交叉</div></div>
+            <div><b>${unitText(hardshipPending.length, "人")}</b><span class="arrow">›</span></div>
+          </div>
+          <div class="todo-subgrid three">
+            ${hardshipTypeList.map(x => `<div class="todo-mini" data-drill="hardship_type_${x.type}"><div class="k">${x.type}</div><div class="v">${unitText(x.count, "人")} · <span class="pct-highlight">${ratio(x.count, Math.max(hardshipPending.length, 1))}%</span></div></div>`).join("")}
+          </div>
+        </div>`;
+  els.workerTodo.querySelectorAll("[data-drill]").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+
+  const highRisk = node.enterprises.filter(e => e.risk === "高").length;
+  const mediumRisk = node.enterprises.filter(e => e.risk === "中").length;
+  els.workerRisk.innerHTML = `
+        <div class="module-head"><span class="module-title">风险预警任务</span><span class="module-link">企业穿透</span></div>
+        <div class="risk-card high" data-drill="risk_high"><div class="risk-title">高风险 ${unitText(highRisk, "家")} 企业</div><div class="risk-desc">欠费/断缴超3个月、参保差异率≥20%、缴费基数做实率<80%</div></div>
+        <div class="risk-card" data-drill="risk_medium"><div class="risk-title">中风险 ${unitText(mediumRisk, "家")} 企业</div><div class="risk-desc">参保登记未缴费、欠费3个月内、灵活就业近30天未缴</div></div>`;
+  els.workerRisk.querySelectorAll("[data-drill]").forEach(el => el.onclick = () => openDrawer(el.dataset.drill));
+}
+
+function getDrawerItems(mode) {
+  if (mode && mode.startsWith("area|")) {
+    const parts = mode.split("|");
+    const unitName = parts[1];
+    const baseMode = parts[2];
+    let unitNode = null;
+    if (state.level === "district") {
+      const s = data.streets.find(x => x.name === unitName);
+      if (s) unitNode = aggregateStreet(s);
+    } else if (state.level === "street") {
+      const v = getStreetObj().villages.find(x => x.name === unitName);
+      if (v) unitNode = v;
+    }
+    if (!unitNode) return [];
+    const residents = unitNode.residents;
+    const enterprises = unitNode.enterprises;
+    const all = [...residents, ...enterprises];
+    const localFilters = {
+      target_all: x => x.type === "居民",
+      target_staff: x => x.type === "企业",
+      target_resident: x => x.type === "居民",
+      done_all: x => x.type === "居民" && x.thisYearPaid,
+      staff_done: x => x.type === "居民" && x.thisYearType === "职工保" && x.thisYearPaid,
+      resident_done: x => x.type === "居民" && x.thisYearType === "居民保" && x.thisYearPaid
+    };
+    return localFilters[baseMode] ? all.filter(localFilters[baseMode]) : all;
+  }
+  const n = currentNode();
+  const residents = n.residents;
+  const enterprises = n.enterprises;
+  const all = [...residents, ...enterprises];
+  if (mode === "resident_done" || mode === "worker_done_resident") return residentDoneListByMetric(n);
+  const isKeyMember = (r, g) => {
+    if (g === "新生儿") return r.age >= 0 && r.age <= 1;
+    if (g === "中小学生") return r.age >= 6 && r.age <= 18 && !!r.isPrimarySecondary;
+    if (g === "高校生") return r.age >= 16 && r.age <= 30 && !!r.isCollege;
+    if (g === "资助对象") return !!r.isHardship;
+    return false;
+  };
+  const filters = {
+    target_all: x => x.type === "居民",
+    target_staff: x => x.type === "企业",
+    target_resident: x => x.type === "居民",
+    done_all: x => x.type === "居民" && x.thisYearPaid,
+    staff_done: x => x.type === "居民" && x.thisYearType === "职工保" && x.thisYearPaid,
+    resident_done: x => x.type === "居民" && x.thisYearType === "居民保" && x.thisYearPaid,
+    staff_people_all: x => x.type === "居民" && x.thisYearType === "职工保",
+    staff_big_unit: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffBigType === "单位参保",
+    staff_big_personal: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffBigType === "个人参保（灵活就业）",
+    staff_detail_onjob: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffDetailType === "在职职工",
+    staff_detail_org_retired: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffDetailType === "单位退休人员",
+    staff_detail_flex_1: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffDetailType === "灵活就业（一档）",
+    staff_detail_flex_2: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffDetailType === "灵活就业（二档）",
+    staff_detail_person_retired_1: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffDetailType === "个人退休（一档）",
+    staff_detail_person_retired_2: x => x.type === "居民" && x.thisYearType === "职工保" && x.staffDetailType === "个人退休（二档）",
+    staff_unit_total: x => x.type === "企业",
+    staff_unit_insured: x => x.type === "企业" && x.staffInsured,
+    staff_unit_uninsured: x => x.type === "企业" && !x.staffInsured,
+    worker_done_resident: x => x.type === "居民" && x.thisYearType === "居民保" && x.thisYearPaid,
+    worker_stock_unpaid: x => x.type === "居民" && isStockMobilizableResident(x),
+    worker_increment_potential: x => x.type === "居民" && isIncrementPotentialResident(x),
+    worker_mobilizable: x => x.type === "居民" && (isStockMobilizableResident(x) || isIncrementPotentialResident(x)),
+    stock_hh_local_res_local: x => x.type === "居民" && isStockMobilizableResident(x) && x.household === "本区户籍" && x.residence === "本区居住",
+    stock_hh_local_res_other: x => x.type === "居民" && isStockMobilizableResident(x) && x.household === "本区户籍" && x.residence !== "本区居住",
+    stock_hh_other_res_local: x => x.type === "居民" && isStockMobilizableResident(x) && x.household !== "本区户籍" && x.residence === "本区居住",
+    stock_hh_other_res_other: x => x.type === "居民" && isStockMobilizableResident(x) && x.household !== "本区户籍" && x.residence !== "本区居住",
+    inc_hh_local_res_local: x => x.type === "居民" && isIncrementPotentialResident(x) && x.household === "本区户籍" && x.residence === "本区居住",
+    inc_hh_local_res_other: x => x.type === "居民" && isIncrementPotentialResident(x) && x.household === "本区户籍" && x.residence !== "本区居住",
+    inc_hh_other_res_local: x => x.type === "居民" && isIncrementPotentialResident(x) && x.household !== "本区户籍" && x.residence === "本区居住",
+    hardship_pending_total: x => x.type === "居民" && x.isHardship && (isStockMobilizableResident(x) || isIncrementPotentialResident(x)),
+    hardship_type_低保对象: x => x.type === "居民" && x.isHardship && x.hardshipType === "低保对象" && (isStockMobilizableResident(x) || isIncrementPotentialResident(x)),
+    hardship_type_残疾对象: x => x.type === "居民" && x.isHardship && x.hardshipType === "残疾对象" && (isStockMobilizableResident(x) || isIncrementPotentialResident(x)),
+    hardship_type_特困对象: x => x.type === "居民" && x.isHardship && x.hardshipType === "特困对象" && (isStockMobilizableResident(x) || isIncrementPotentialResident(x)),
+    resident_stock_done: x => x.type === "居民" && x.lastYearPaid && x.thisYearPaid,
+    resident_increment_done: x => x.type === "居民" && !x.lastYearPaid && x.thisYearPaid,
+    gap_staff: x => x.type === "企业" && x.risk !== "低",
+    gap_resident: x => x.type === "居民" && !x.thisYearPaid,
+    mobilize_total: x => x.type === "居民" && (isStockMobilizableResident(x) || (isIncrementPotentialResident(x) && x.household === "本区户籍")),
+    mobilize_stock: x => x.type === "居民" && isStockMobilizableResident(x),
+    mobilize_increment: x => x.type === "居民" && isIncrementPotentialResident(x) && x.household === "本区户籍",
+    need_mobilize: x => x.type === "居民" ? !x.thisYearPaid : x.risk !== "低",
+    progress: x => x.type === "居民",
+    stock_total: x => x.type === "居民" && x.lastYearLocalPaid,
+    stock_insured: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "存量续保",
+    stock_retained: x => x.type === "居民" && x.lastYearLocalPaid && x.stockChangeType === "存量续保",
+    stock_loss: x => x.type === "居民" && x.lastYearLocalPaid && ["死亡", "辖区外参保", "停保", "转职工保（含灵活就业参保）"].includes(x.stockChangeType),
+    stock_unpaid: x => x.type === "居民" && isStockMobilizableResident(x),
+    stock_uninsured: x => x.type === "居民" && isStockMobilizableResident(x),
+    increment_new: x => x.type === "居民" && ((!x.lastYearPaid) || (x.lastYearPaid && !x.lastYearLocalPaid)) && x.thisYearPaid && x.insuredPlace === "本区县参保",
+    increment_potential: x => x.type === "居民" && x.household === "本区户籍" && isIncrementPotentialResident(x),
+    gender_male: x => x.type === "居民" && x.gender === "男",
+    gender_female: x => x.type === "居民" && x.gender === "女",
+    local_local: x => x.type === "居民" && x.household === "本区户籍" && x.residence === "本区居住",
+    local_other: x => x.type === "居民" && x.household === "本区户籍" && x.residence === "外区居住",
+    nonlocal_local: x => x.type === "居民" && x.household === "非本区户籍" && x.residence === "本区居住",
+    hh_local_total: x => x.type === "居民" && x.household === "本区户籍",
+    hh_local_insured: x => x.type === "居民" && x.household === "本区户籍" && x.thisYearPaid,
+    hh_local_uninsured: x => x.type === "居民" && x.household === "本区户籍" && !x.thisYearPaid,
+    hh_local_insured_local: x => x.type === "居民" && x.household === "本区户籍" && x.thisYearPaid && x.insuredPlace === "本区县参保",
+    hh_local_insured_city_other: x => x.type === "居民" && x.household === "本区户籍" && x.thisYearPaid && x.insuredPlace === "市内外区参保",
+    hh_local_insured_outcity: x => x.type === "居民" && x.household === "本区户籍" && x.thisYearPaid && x.insuredPlace === "市外参保",
+    hh_local_uninsured_res_local: x => x.type === "居民" && x.household === "本区户籍" && !x.thisYearPaid && x.residenceDetail === "本辖区",
+    hh_local_uninsured_res_district_other: x => x.type === "居民" && x.household === "本区户籍" && !x.thisYearPaid && x.residenceDetail === "区内其他辖区",
+    hh_local_uninsured_res_city_other: x => x.type === "居民" && x.household === "本区户籍" && !x.thisYearPaid && x.residenceDetail === "市内外区",
+    hh_local_uninsured_res_outcity: x => x.type === "居民" && x.household === "本区户籍" && !x.thisYearPaid && x.residenceDetail === "市外",
+    hh_nonlocal_live_total: x => x.type === "居民" && x.household === "非本区户籍" && x.residenceDetail === "本辖区",
+    hh_nonlocal_live_insured: x => x.type === "居民" && x.household === "非本区户籍" && x.residenceDetail === "本辖区" && x.thisYearPaid,
+    hh_nonlocal_live_uninsured: x => x.type === "居民" && x.household === "非本区户籍" && x.residenceDetail === "本辖区" && !x.thisYearPaid,
+    risk_high: x => x.type === "企业" && x.risk === "高",
+    risk_medium: x => x.type === "企业" && x.risk === "中",
+    flow_resident: x => x.type === "居民" && x.pauseFlow === "转居民保",
+    flow_pause: x => x.type === "居民" && x.pauseFlow === "申请停保",
+    flow_transfer: x => x.type === "居民" && x.pauseFlow === "跨区转出"
+  };
+  if (mode && mode.startsWith("age_gender|")) {
+    const parts = mode.split("|");
+    const ageGroup = parts[1];
+    const gender = parts[2];
+    return residents.filter(r => r.ageGroup === ageGroup && r.gender === gender);
+  }
+  if (mode && mode.startsWith("age_")) return residents.filter(r => r.ageGroup === mode.replace("age_", ""));
+  if (mode && mode.startsWith("key_insured_")) { const g = mode.replace("key_insured_", ""); return residents.filter(r => isKeyMember(r, g) && r.thisYearPaid); }
+  if (mode && mode.startsWith("key_uninsured_")) { const g = mode.replace("key_uninsured_", ""); return residents.filter(r => isKeyMember(r, g) && !r.thisYearPaid); }
+  if (mode && mode.startsWith("key_")) return residents.filter(r => isKeyMember(r, mode.replace("key_", "")));
+  if (mode && mode.startsWith("loss_")) return residents.filter(r => r.lossReason === mode.replace("loss_", ""));
+  if (filters[mode]) return all.filter(filters[mode]);
+  return all;
+}
+
+function openDrawer(mode) {
+  state.drawer = mode;
+  closeArchive();
+  const titleMap = {
+    target_all: "目标覆盖对象名单",
+    target_staff: "职工保目标对象名单",
+    target_resident: "居民保目标对象名单",
+    done_all: "已完成参保名单",
+    staff_done: "已参保-职工保名单",
+    resident_done: "已参保-居民保名单",
+    staff_people_all: "职工参保总人数名单",
+    staff_big_unit: "单位参保职工名单",
+    staff_big_personal: "个人参保职工名单",
+    staff_detail_onjob: "单位参保-在职职工名单",
+    staff_detail_org_retired: "单位参保-单位退休人员名单",
+    staff_detail_flex_1: "个人参保-灵活就业（一档）名单",
+    staff_detail_flex_2: "个人参保-灵活就业（二档）名单",
+    staff_detail_person_retired_1: "个人参保-个人退休（一档）名单",
+    staff_detail_person_retired_2: "个人参保-个人退休（二档）名单",
+    staff_unit_total: "全辖区单位总名单",
+    staff_unit_insured: "参加职工保单位名单",
+    staff_unit_uninsured: "未参加职工保单位名单",
+    worker_done_resident: "已参保（居民保）名单",
+    worker_stock_unpaid: "存量未参保（可动员）名单",
+    worker_increment_potential: "可扩增量名单",
+    worker_mobilizable: "可动员总名单",
+    stock_hh_local_res_local: "存量未参保-户在人在名单",
+    stock_hh_local_res_other: "存量未参保-户在人不在名单",
+    stock_hh_other_res_local: "存量未参保-人在户不在名单",
+    stock_hh_other_res_other: "存量未参保-人户均不在名单",
+    inc_hh_local_res_local: "可扩增量-户在人在名单",
+    inc_hh_local_res_other: "可扩增量-户在人不在名单",
+    inc_hh_other_res_local: "可扩增量-人在户不在名单",
+    hardship_pending_total: "重点资助对象（待动员）名单",
+    hardship_type_低保对象: "重点资助对象-低保对象名单",
+    hardship_type_残疾对象: "重点资助对象-残疾对象名单",
+    hardship_type_特困对象: "重点资助对象-特困对象名单",
+    resident_stock_done: "居民保-存量贡献名单",
+    resident_increment_done: "居民保-增量贡献名单",
+    gap_staff: "差距-职工保名单",
+    gap_resident: "差距-居民保名单",
+    mobilize_total: "居民保可动员总名单",
+    mobilize_stock: "居民保可动员-存量名单",
+    mobilize_increment: "居民保可动员-增量名单",
+    need_mobilize: "需动员对象名单", progress: "参保进度对象名单", stock_total: "存量总数名单", stock_insured: "存量已参保（续保）名单", stock_uninsured: "存量未参保（可动员）名单", stock_retained: "存量巩固（续保）名单", stock_loss: "存量减员（已确认）名单", stock_unpaid: "存量未参保（可动员）人员名单",
+    hh_local_total: "辖区户籍总人口名单", hh_local_insured: "辖区户籍-已参保名单", hh_local_uninsured: "辖区户籍-未参保名单",
+    hh_local_insured_local: "已参保户籍-本区县参保名单", hh_local_insured_city_other: "已参保户籍-市内外区参保名单", hh_local_insured_outcity: "已参保户籍-市外参保名单",
+    hh_local_uninsured_res_local: "未参保户籍-居住本辖区名单", hh_local_uninsured_res_district_other: "未参保户籍-居住区内其他辖区名单",
+    hh_local_uninsured_res_city_other: "未参保户籍-居住市内外区名单", hh_local_uninsured_res_outcity: "未参保户籍-居住市外名单",
+    hh_nonlocal_live_total: "非户籍居住总人口名单", hh_nonlocal_live_insured: "非户籍居住-已参保名单", hh_nonlocal_live_uninsured: "非户籍居住-未参保名单",
+    increment_new: "新增参保名单", increment_potential: "可扩增量名单", risk_high: "高风险企业预警名单", risk_medium: "中风险企业预警名单",
+    flow_resident: "转居民保名单", flow_pause: "申请停保名单", flow_transfer: "跨区转出名单"
+  };
+  if (mode && mode.startsWith("area|")) {
+    const parts = mode.split("|");
+    const unitName = parts[1];
+    const baseMode = parts[2];
+    const metricLabel = {
+      target_all: "总任务",
+      done_all: "总已完成",
+      target_staff: "职工保任务",
+      staff_done: "职工保已完成",
+      target_resident: "居民保任务",
+      resident_done: "居民保已完成"
+    };
+    titleMap[mode] = `${unitName} · ${metricLabel[baseMode] || "对象名单"}`;
+  }
+  if (mode && mode.startsWith("age_gender|")) {
+    const parts = mode.split("|");
+    titleMap[mode] = `年龄组：${parts[1]}（${parts[2]}）`;
+  }
+  if (mode && mode.startsWith("age_") && !mode.startsWith("age_gender|")) titleMap[mode] = `年龄组：${mode.replace("age_", "")}`;
+  if (mode && mode.startsWith("key_insured_")) titleMap[mode] = `${mode.replace("key_insured_", "")}：已参保名单`;
+  if (mode && mode.startsWith("key_uninsured_")) titleMap[mode] = `${mode.replace("key_uninsured_", "")}：未参保名单`;
+  if (mode && mode.startsWith("key_") && !mode.startsWith("key_insured_") && !mode.startsWith("key_uninsured_")) titleMap[mode] = `重点对象：${mode.replace("key_", "")}`;
+  if (mode && mode.startsWith("loss_")) titleMap[mode] = `减员原因：${mode.replace("loss_", "")}`;
+  els.drawerTitle.textContent = titleMap[mode] || "明细名单";
+  if (isResidentOnlyDrillMode(mode)) {
+    els.drawerType.innerHTML = `<option value="居民">居民</option>`;
+  } else if (isEnterpriseOnlyDrillMode(mode)) {
+    els.drawerType.innerHTML = `<option value="企业">企业</option>`;
+  } else {
+    els.drawerType.innerHTML = `<option value="all">全部</option><option value="居民">居民</option><option value="企业">企业</option>`;
+  }
+  const baseItems = getDrawerItems(mode);
+  const typeSet = new Set(baseItems.map(x => x.type));
+  const defaults = inferDefaultFilters(mode);
+  const fallbackType = typeSet.size === 1 ? [...typeSet][0] : "all";
+  const preferredType = (defaults.type && defaults.type !== "all") ? defaults.type : fallbackType;
+  els.drawerType.value = preferredType;
+  state.selectedTags = defaults.tags || [];
+  // 年龄下钻强制兜底：锁定居民并清空标签，避免历史状态导致0条
+  if (mode && (mode.startsWith("age_") || mode.startsWith("age_gender|"))) {
+    els.drawerType.value = "居民";
+    state.selectedTags = [];
+  }
+  els.searchName.value = "";
+  els.searchSecond.value = "";
+  els.searchAddress.value = "";
+  updateQueryPlaceholders();
+  renderConditionPanel();
+  renderDrawerList();
+  els.drawer.classList.add("show");
+  document.body.classList.add("page-lock");
+}
+
+function maskPhone(v) {
+  if (!v) return "-";
+  if (state.showFullPhone) return v;
+  return `${v.slice(0, 3)}****${v.slice(-4)}`;
+}
+
+function inferDefaultFilters(mode) {
+  const out = { type: "", tags: [] };
+  if (mode.startsWith("risk_") || mode.startsWith("staff_unit_")) out.type = "企业";
+  if (mode.startsWith("flow_") || mode.startsWith("age_") || mode.startsWith("age_gender|") || mode.startsWith("gender_") || mode.startsWith("key_") || mode.startsWith("hh_") || mode.startsWith("loss_") || mode.startsWith("worker_") || mode.startsWith("stock_") || mode.startsWith("inc_")) out.type = "居民";
+  const map = {
+    risk_high: ["高"],
+    risk_medium: ["中"],
+    flow_resident: ["转居民保"],
+    flow_pause: ["申请停保"],
+    flow_transfer: ["跨区转出"],
+    stock_uninsured: ["可动员"],
+    stock_unpaid: ["可动员"],
+    worker_stock_unpaid: ["可动员"],
+    worker_increment_potential: ["未参保"],
+    worker_done_resident: ["居民保"]
+  };
+  // 年龄段下钻已由 getDrawerItems(age_xxx)完成过滤；固定条件筛选不含年龄标签，避免二次过滤成空
+  if (mode.startsWith("age_")) out.tags = [];
+  if (mode.startsWith("age_gender|")) out.tags = [];
+  if (mode.startsWith("loss_")) out.tags = [mode.replace("loss_", "")];
+  // 重点对象下钻由 getDrawerItems(key_xxx)完成过滤，避免再叠加标签导致口径偏差
+  if (mode.startsWith("key_insured_")) out.tags = [];
+  if (mode.startsWith("key_uninsured_")) out.tags = [];
+  if (mode.startsWith("key_") && !mode.startsWith("key_insured_") && !mode.startsWith("key_uninsured_")) out.tags = [];
+  if (map[mode]) out.tags = [...map[mode]];
+  return out;
+}
+
+function getTagGroups() {
+  const groups = {};
+  FIXED_TAG_SCHEMA.forEach(x => { groups[x.group] = [...x.tags]; });
+  return groups;
+}
+
+function renderConditionPanel() {
+  const groups = getTagGroups();
+  const html = Object.keys(groups).length === 0
+    ? '<div class="mini">暂无可选标签</div>'
+    : Object.entries(groups).map(([g, tags]) => `
+            <div class="cond-group">
+              <div class="cond-group-title">${g}</div>
+              <div class="cond-items">
+                ${tags.map(tag => `<label class="cond-item"><input type="checkbox" data-tag="${tag}" ${state.selectedTags.includes(tag) ? "checked" : ""}/> ${tag}</label>`).join("")}
+              </div>
+            </div>`).join("");
+  els.condGroups.innerHTML = html;
+  els.condGroups.querySelectorAll("input[data-tag]").forEach(chk => {
+    chk.onchange = () => {
+      const tag = chk.dataset.tag;
+      if (chk.checked) {
+        if (!state.selectedTags.includes(tag)) state.selectedTags.push(tag);
+      } else {
+        state.selectedTags = state.selectedTags.filter(tg => tg !== tag);
+      }
+    };
+  });
+}
+
+function updateQueryPlaceholders() {
+  if (isResidentOnlyDrillMode(state.drawer)) {
+    els.searchName.placeholder = "居民姓名（模糊）";
+    els.searchSecond.placeholder = "联系电话（模糊）";
+    els.searchAddress.placeholder = "地址（户籍/居住，模糊）";
+    return;
+  }
+  if (isEnterpriseOnlyDrillMode(state.drawer)) {
+    els.searchName.placeholder = "企业名称（模糊）";
+    els.searchSecond.placeholder = "联系人（模糊）";
+    els.searchAddress.placeholder = "企业地址（模糊）";
+    return;
+  }
+  const t = els.drawerType.value || "all";
+  if (t === "企业") {
+    els.searchName.placeholder = "企业名称（模糊）";
+    els.searchSecond.placeholder = "联系人（模糊）";
+    els.searchAddress.placeholder = "企业地址（模糊）";
+  } else if (t === "居民") {
+    els.searchName.placeholder = "居民姓名（模糊）";
+    els.searchSecond.placeholder = "联系电话（模糊）";
+    els.searchAddress.placeholder = "地址（户籍/居住，模糊）";
+  } else {
+    els.searchName.placeholder = "姓名/企业名称（模糊）";
+    els.searchSecond.placeholder = "联系电话/联系人（模糊）";
+    els.searchAddress.placeholder = "地址（户籍/居住/企业地址，模糊）";
+  }
+}
+
+function isResidentOnlyDrillMode(mode) {
+  if (!mode) return false;
+  if (mode.startsWith("gender_")) return true;
+  if (mode.startsWith("age_") || mode.startsWith("age_gender|")) return true;
+  if (mode === "staff_people_all" || mode === "staff_big_unit" || mode === "staff_big_personal") return true;
+  if (mode.startsWith("staff_detail_")) return true;
+  return false;
+}
+
+function isEnterpriseOnlyDrillMode(mode) {
+  if (!mode) return false;
+  return mode.startsWith("risk_") || mode.startsWith("staff_unit_");
+}
+
+function renderDrawerList() {
+  let items = getDrawerItems(state.drawer);
+  const seen = new Set();
+  items = items.filter(i => {
+    const k = i.id || `${i.type}|${i.name}|${i.phone || ""}|${i.hukouAddress || i.regAddress || ""}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const t = els.drawerType.value || "all";
+  if (t !== "all") items = items.filter(i => i.type === t);
+  if (state.selectedTags.length) {
+    items = items.filter(i => {
+      const tags = getTags(i).map(x => x.text);
+      return state.selectedTags.every(s => tags.includes(s));
+    });
+  }
+  const kwName = (els.searchName.value || "").trim();
+  const kwSecond = (els.searchSecond.value || "").trim();
+  const kwAddr = (els.searchAddress.value || "").trim();
+  if (kwName) items = items.filter(i => (i.name || "").includes(kwName));
+  if (kwSecond) items = items.filter(i => i.type === "居民" ? (i.phone || "").includes(kwSecond) : ((i.contactPerson || "").includes(kwSecond)));
+  if (kwAddr) items = items.filter(i => i.type === "居民"
+    ? ((i.livingAddress || "").includes(kwAddr) || (i.hukouAddress || "").includes(kwAddr))
+    : (i.regAddress || "").includes(kwAddr));
+  items.sort((a, b) => (b.duration || 0) - (a.duration || 0));
+
+  const summaryParts = [];
+  const typeTxt = (els.drawerType.value || "all");
+  if (typeTxt !== "all") summaryParts.push(typeTxt);
+  if (state.selectedTags.length) summaryParts.push(state.selectedTags.join("、"));
+  if (kwName) summaryParts.push(`名:${kwName}`);
+  if (kwSecond) summaryParts.push(`联:${kwSecond}`);
+  if (kwAddr) summaryParts.push(`址:${kwAddr}`);
+  els.drawerResultText.textContent = `当前筛选结果：${items.length} 条${summaryParts.length ? " · " + summaryParts.join(" / ") : ""}`;
+  els.drawerList.innerHTML = (items.map(x => {
+    const tags = getCardTags(x).map(renderCardTag).join("");
+    const title = x.type === "居民"
+      ? `<button class="link-btn archive-open" data-archive-type="person" data-id="${x.id}"><b>${x.name}</b></button>`
+      : `<button class="link-btn archive-open" data-archive-type="enterprise" data-id="${x.id}"><b>${x.name}</b></button>`;
+    const ext = x.type === "居民"
+      ? `<div class="mini">联系电话：${maskPhone(x.phone)}</div>
+             <div class="mini">户籍地址：<button class="link-btn archive-meta" data-archive-type="building-by-address" data-id="${x.id}" data-address-kind="hukou">${x.hukouAddress || "-"}</button></div>
+             <div class="mini">居住地址：<button class="link-btn archive-meta" data-archive-type="building-by-address" data-id="${x.id}" data-address-kind="live">${x.livingAddress || "-"}</button></div>
+             `
+      : `<div class="mini">法人代表：${x.legalPerson || "-"}</div>
+             <div class="mini">联系人：${x.contactPerson || "-"} · ${maskPhone(x.phone)}</div>
+             <div class="mini">注册地址：<button class="link-btn archive-meta" data-archive-type="building-by-enterprise" data-id="${x.id}">${x.regAddress || "-"}</button></div>`;
+    return `<div class="list-item"><div><div>${title}</div><div class="mini">${x.place} · ${x.reason || ""}</div>${ext}<div class="tags">${tags}</div></div></div>`;
+  }).join("") || '<div class="mini">暂无匹配对象</div>');
+  els.drawerList.querySelectorAll("[data-archive-type]").forEach(el => {
+    el.onclick = (e) => {
+      e.preventDefault();
+      const type = el.dataset.archiveType;
+      const id = el.dataset.id;
+      if (type === "person") return openArchive("person", id);
+      if (type === "enterprise") return openArchive("enterprise", id);
+      if (type === "household") return openArchive("household", id);
+      if (type === "building") return openArchive("building", id);
+      if (type === "building-by-address") return openArchive("building", id, { addressKind: el.dataset.addressKind || "live" });
+      if (type === "building-by-enterprise") return openArchive("buildingByEnterprise", id);
+    };
+  });
+}
+
+function renderCardTag(tag) {
+  if (!tag || !tag.text) return "";
+  const base = `tag ${tag.level || ""}`.trim();
+  if (tag.text === "新生儿") return '<span class="tag key-newborn">新生儿</span>';
+  if (tag.text === "资助对象") return '<span class="tag key-hardship">资助对象</span>';
+  return `<span class="${base}">${tag.text}</span>`;
+}
+
+function getCardTags(x) {
+  if (x.type === "居民") {
+    const insureType = x.thisYearType || (x.thisYearPaid ? "居民保" : "未参保");
+    const insureStatus = x.thisYearPaid ? "已参保" : "未参保";
+    const insurePlace = x.thisYearPaid ? (x.insuredPlace || "参保地待核") : "参保地待核";
+    const subtitleTags = [
+      { text: x.gender || "", level: "" },
+      { text: `${x.age || 0}岁`, level: "" },
+      ...(x.keyGroup && x.keyGroup !== "无" ? [{ text: x.keyGroup, level: "warn" }] : []),
+      { text: x.household || "", level: "" },
+      { text: x.residence || "", level: "" }
+    ].filter(t => t.text);
+    const insureTags = [
+      { text: insureStatus, level: insureStatus === "未参保" ? "danger" : "ok" },
+      { text: insureType, level: insureType === "未参保" ? "danger" : "ok" },
+      { text: insurePlace, level: x.thisYearPaid ? "ok" : "warn" }
+    ];
+    return [...subtitleTags, ...insureTags];
+  }
+
+  const subtitleTags = [
+    { text: x.unitType || "", level: "" },
+    { text: x.industryClass || "", level: "" },
+    { text: x.unitNature || "", level: "" }
+  ].filter(t => t.text);
+  const insureTag = { text: x.staffInsured ? "正常参保" : "未参保", level: x.staffInsured ? "ok" : "danger" };
+  const riskTags = [
+    ...(x.risk ? [{ text: x.risk, level: x.risk === "高" ? "danger" : (x.risk === "中" ? "warn" : "ok") }] : []),
+    ...(x.reason ? [{ text: x.reason, level: x.risk === "高" ? "danger" : "warn" }] : []),
+    { text: `欠费${x.duration || 0}月`, level: "warn" }
+  ];
+  return [...subtitleTags, insureTag, ...riskTags];
+}
+
+function getTags(x) {
+  const levelText = state.level === "district" ? "区级" : (state.level === "street" ? "镇街" : "村居");
+  if (x.type === "居民") {
+    const thisYearType = x.thisYearType || (x.thisYearPaid ? "居民保" : "未参保");
+    const stockType = x.stockChangeType || "";
+    const keyType = x.keyGroup !== "无" ? x.keyGroup : "";
+    return [
+      { text: "居民", level: "ok", group: "对象类型标签" },
+      { text: levelText, level: "", group: "层级" },
+      { text: x.gender, level: "", group: "人员性别" },
+      { text: x.household, level: "", group: "居民户籍" },
+      { text: x.residence, level: "", group: "居民居住" },
+      { text: x.residenceDetail || x.residence, level: "", group: "居民居住细分" },
+      ...(x.insuredPlace ? [{ text: x.insuredPlace, level: "ok", group: "参保地" }] : []),
+      { text: thisYearType, level: thisYearType === "未参保" ? "danger" : "ok", group: "今年参保类型" },
+      ...(stockType ? [{ text: stockType, level: stockType === "可动员" ? "warn" : "", group: "存量变化类型" }] : []),
+      ...(x.lossReason ? [{ text: x.lossReason, level: "danger", group: "存量减员原因" }] : []),
+      ...(x.pauseFlow ? [{ text: x.pauseFlow, level: "warn", group: "职工减员流向" }] : []),
+      ...(keyType ? [{ text: keyType, level: "warn", group: "重点对象" }] : []),
+      ...(x.hardshipType ? [{ text: x.hardshipType, level: "warn", group: "资助对象细类" }] : []),
+      ...(x.thisYearType === "职工保" ? [
+        { text: x.staffBigType || "单位参保", level: "", group: "职工参保大类" },
+        { text: x.staffDetailType || "在职职工", level: "", group: "职工参保细类" }
+      ] : [])
+    ];
+  }
+  return [
+    { text: "企业", level: "ok", group: "对象类型标签" },
+    { text: levelText, level: "", group: "层级" },
+    { text: x.staffInsured ? "参加职工保" : "未参加职工保", level: x.staffInsured ? "ok" : "warn", group: "单位参保状态" },
+    { text: x.risk, level: x.risk === "高" ? "danger" : (x.risk === "中" ? "warn" : "ok"), group: "企业风险等级" },
+    { text: x.reason, level: x.risk === "高" ? "danger" : "warn", group: "风险原因" },
+    { text: "欠费" + (x.duration || 0) + "月", level: "warn", group: "风险原因" }
+  ];
+}
+
+function allResidents() {
+  return currentNode().residents || [];
+}
+function allEnterprises() {
+  return currentNode().enterprises || [];
+}
+function byId(list, id) {
+  return list.find(x => x.id === id) || null;
+}
+function kpiCard(label, valueHtml) {
+  return `<div class="archive-kpi"><div class="k">${label}</div><div class="v">${valueHtml}</div></div>`;
+}
+function lineRow(label, valueHtml) {
+  return `<div class="archive-line"><span>${label}</span><b>${valueHtml}</b></div>`;
+}
+function makeEnterpriseTrendSeries(ent, currentCount) {
+  const y = Number(state.insuranceYear || new Date().getFullYear());
+  const monthNow = Math.max(1, Math.min(12, new Date().getMonth() + 1));
+  const base = Math.max(Number(currentCount || 0), 0);
+  const vals = [];
+  for (let m = 1; m <= 12; m += 1) {
+    const wave = Math.sin((m + ent.id.length) * 0.8) * Math.max(2, base * 0.03);
+    const noise = (seededRand((y + m + ent.id.length) * 41) - 0.5) * Math.max(4, base * 0.06);
+    const trend = (m - 6) * Math.max(0.2, base * 0.002);
+    vals.push(m <= monthNow ? Math.max(0, Math.round(base + wave + noise + trend)) : null);
+  }
+  vals[monthNow - 1] = base;
+  return { year: y, monthNow, vals };
+}
+function renderEnterpriseTrendSvg(vals, monthNow) {
+  if (!vals || !vals.length) return "";
+  const w = 360;
+  const h = 150;
+  const px = 18;
+  const py = 22;
+  const validVals = vals.filter(v => typeof v === "number");
+  if (!validVals.length) return "";
+  const minV = Math.min(...validVals);
+  const maxV = Math.max(...validVals);
+  const span = Math.max(maxV - minV, 1);
+  const step = (w - px * 2) / Math.max(vals.length - 1, 1);
+  const yOf = (v) => (h - py) - ((v - minV) / span) * (h - py * 2);
+  const pts = vals
+    .map((v, i) => (typeof v === "number" ? [px + i * step, yOf(v), v, i + 1] : null))
+    .filter(Boolean);
+  const line = pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const area = `M ${pts[0][0].toFixed(1)} ${h - py} L ${line} L ${pts[pts.length - 1][0].toFixed(1)} ${h - py} Z`;
+  const labels = Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+    const x = px + (m - 1) * step;
+    return `<text class="trend-label" x="${x.toFixed(1)}" y="${h - 4}" text-anchor="middle">${m}月</text>`;
+  }).join("");
+  const dots = pts.map((p) => {
+    const cls = p[3] === monthNow ? "trend-dot current" : "trend-dot";
+    return `<circle class="${cls}" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${p[3] === monthNow ? 3.2 : 2.2}"></circle>`;
+  }).join("");
+  const monthVals = pts.map((p) => {
+    const anchor = p[3] === monthNow ? "end" : "middle";
+    const x = p[3] === monthNow ? p[0] - 2 : p[0];
+    const y = Math.max(10, p[1] - 6);
+    return `<text class="trend-point-value" x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}">${p[2]}</text>`;
+  }).join("");
+  const cur = vals[Math.max(monthNow - 1, 0)] || 0;
+  const futureBlank = monthNow < 12
+    ? `<rect x="${(px + monthNow * step + 1).toFixed(1)}" y="${py}" width="${((12 - monthNow) * step).toFixed(1)}" height="${(h - py * 2).toFixed(1)}" fill="#f8fafc"></rect>`
+    : "";
+  return `
+        <svg class="trend-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+          <line class="trend-grid" x1="${px}" y1="${h - py}" x2="${w - px}" y2="${h - py}"></line>
+          <line class="trend-grid" x1="${px}" y1="${py}" x2="${px}" y2="${h - py}"></line>
+          <path class="trend-area" d="${area}"></path>
+          <polyline class="trend-line" points="${line}"></polyline>
+          ${dots}
+          ${futureBlank}
+          ${monthVals}
+          ${labels}
+          <text class="trend-value" x="${w - px}" y="${py - 8}" text-anchor="end">当前：${cur}人</text>
+        </svg>`;
+}
+function archiveIcon(type) {
+  const map = {
+    shield: `<svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 5-3.5 7.8-7 9-3.5-1.2-7-4-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>`,
+    card: `<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>`,
+    map: `<svg viewBox="0 0 24 24"><path d="M9 4l6-2v18l-6 2-6-2V6l6-2z"/><path d="M15 2l6 2v14l-6 2"/></svg>`,
+    user: `<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/></svg>`,
+    phone: `<svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 11.2 19 19.3 19.3 0 0 1 5 12.8 19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7l.4 2.6a2 2 0 0 1-.6 1.8L7.2 9.8a16 16 0 0 0 7 7l1.7-1.7a2 2 0 0 1 1.8-.6l2.6.4A2 2 0 0 1 22 16.9z"/></svg>`,
+    pin: `<svg viewBox="0 0 24 24"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>`,
+    home: `<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>`,
+    calendar: `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>`,
+    walk: `<svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="2"/><path d="M7 21l2-6 2 2 1 4M9 9l3 2 2-1 2 2M7 13l2-3"/></svg>`
+  };
+  return map[type] || map.user;
+}
+function makeResidentYearRecords(r) {
+  const y = Number(state.insuranceYear || new Date().getFullYear());
+  const years = [y - 3, y - 2, y - 1, y];
+  return years.map((yr, idx) => {
+    if (idx === 3) {
+      return { year: yr, type: r.thisYearType, paid: !!r.thisYearPaid, place: r.insuredPlace || "-", note: r.thisYearPaid ? "当年已登记缴费" : "当年未完成参保缴费" };
+    }
+    if (idx === 2) {
+      return { year: yr, type: r.lastYearPaid ? "居民保" : "未参保", paid: !!r.lastYearPaid, place: r.lastYearLocalPaid ? "本区县参保" : "辖区外参保", note: r.lastYearPaid ? "上年参保基线" : "上年未参保" };
+    }
+    const under18 = Math.max(0, r.age - (y - yr)) < 18;
+    const paid = seededRand((yr + r.id.length) * 13) > 0.2;
+    const type = paid ? (under18 ? "居民保" : (seededRand((yr + r.id.length) * 19) > 0.72 ? "职工保" : "居民保")) : "未参保";
+    return { year: yr, type, paid, place: paid ? (seededRand((yr + r.id.length) * 23) > 0.75 ? "市内外区参保" : "本区县参保") : "-", note: paid ? "历史缴费记录" : "历史未参保记录" };
+  }).sort((a, b) => b.year - a.year);
+}
+function makeMobilizeLogs(r) {
+  const y = Number(state.insuranceYear || new Date().getFullYear());
+  const workerPool = ["周网格员", "李网格员", "陈网格员", "杨网格员"];
+  return [
+    { date: `${y}-08-02`, worker: workerPool[r.id.length % 4], content: r.thisYearPaid ? "完成参保登记，纳入已参保台账" : "未完成参保，列入持续动员对象" },
+    { date: `${y}-06-19`, worker: workerPool[(r.id.length + 1) % 4], content: "社区复访，跟进材料补齐情况" },
+    { date: `${y}-03-08`, worker: workerPool[(r.id.length + 2) % 4], content: "上门走访，说明政策与参保流程" },
+    { date: `${y}-01-12`, worker: workerPool[(r.id.length + 3) % 4], content: "电话提醒，核对参保状态" }
+  ];
+}
+function addressOfResident(r, addressKind) {
+  return addressKind === "hukou" ? (r.hukouAddress || "") : (r.livingAddress || "");
+}
+function parsedResidentAddr(r, addressKind) {
+  return parseStdAddress(addressOfResident(r, addressKind));
+}
+function renderFocusTag(label, mode = "text") {
+  if (!label) return "";
+  if (label === "新生儿") {
+    return mode === "tag"
+      ? '<span class="tag key-newborn">新生儿</span>'
+      : '<span class="key-label-newborn">新生儿</span>';
+  }
+  if (label === "资助对象") {
+    return mode === "tag"
+      ? '<span class="tag key-hardship">资助对象</span>'
+      : '<span class="key-label-hardship">资助对象</span>';
+  }
+  return label;
+}
+function formatInsuranceDisplay(type, paid) {
+  const thisType = type || (paid ? "居民保" : "未参保");
+  if (thisType === "未参保") return "未参保";
+  return `${thisType} · ${paid ? "已参保" : "未参保"}`;
+}
+function openArchive(kind, id, opts = {}) {
+  const residents = allResidents();
+  const enterprises = allEnterprises();
+  els.condPanel.classList.remove("show");
+  if (!els.drawer.classList.contains("show")) return;
+  if (kind === "person") {
+    const r = byId(residents, id);
+    if (!r) return;
+    state.archive = { kind, residentId: id };
+    const keyLabel = r.keyGroup && r.keyGroup !== "无" ? r.keyGroup : "";
+    const keyLabelHtml = renderFocusTag(keyLabel);
+    const baseAttr = [r.gender, `${r.age || 0}岁`, keyLabelHtml, r.household, r.residence].filter(Boolean).join(" / ");
+    const insureType = r.thisYearType || (r.thisYearPaid ? "居民保" : "未参保");
+    const insureDetail = insureType === "职工保" ? (r.staffDetailType || "") : "";
+    const insurePlace = r.thisYearPaid ? (r.insuredPlace || "") : "";
+    let stockTag = "";
+    if (r.lastYearLocalPaid && r.thisYearPaid && insureType === "居民保" && insurePlace === "本区县参保") stockTag = "存量续保";
+    if (!r.lastYearLocalPaid && r.thisYearPaid && insurePlace === "本区县参保") stockTag = "增量扩面";
+    const yearly = makeResidentYearRecords(r);
+    const logs = makeMobilizeLogs(r);
+    els.archiveTitle.textContent = r.name;
+    els.archiveSub.innerHTML = baseAttr || `${r.id} · ${r.place}`;
+    els.archiveBody.innerHTML = `
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("shield")}<span>参保情况</span></div>
+              <span class="stat-time">统计时间：${state.insuranceYear}年度</span>
+            </div>
+            <div class="person-insure-grid">
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>当年参保状态</span></div>
+                <div class="person-insure-value ${r.thisYearPaid ? "" : "person-insure-alert"}">${r.thisYearPaid ? "已参保" : "未参保"}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>参保类型</span></div>
+                <div class="person-insure-value">${insureType}</div>
+                ${insureDetail ? `<div class="person-insure-sub">${insureDetail}</div>` : ""}
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>参保地</span></div>
+                <div class="person-insure-value">${insurePlace || "-"}</div>
+                ${(stockTag || (!r.thisYearPaid ? "未形成存量/增量归类" : "")) ? `<div class="person-insure-sub">${stockTag || "未形成存量/增量归类"}</div>` : ""}
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("user")}<span>基本信息</span></div>
+              <button class="btn-mini pill" id="toHouseholdBtn">查看户档案</button>
+            </div>
+            <div class="basic-info-list">
+              <div class="basic-info-item">
+                ${archiveIcon("phone")}
+                <div>
+                  <div class="k">联系电话</div>
+                  <div class="v archive-phone-line">
+                    <span id="archivePhoneValue">${maskPhone(r.phone)}</span>
+                    <label class="archive-phone-toggle"><input type="checkbox" id="archivePhoneToggle" ${state.showFullPhone ? "checked" : ""}/>显示完整手机号</label>
+                  </div>
+                </div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("card")}
+                <div>
+                  <div class="k">工作单位</div>
+                  <div class="v">${r.employerId ? `<button class="link-btn archive-open" data-to-enterprise="${r.employerId}">${r.employerName || "查看企业档案"}</button>` : "无工作单位"}</div>
+                </div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("pin")}
+                <div>
+                  <div class="k">户籍地址</div>
+                  <div class="v"><button class="link-btn archive-open" data-to-building="${r.id}" data-address-kind="hukou">${r.hukouAddress || "-"}</button></div>
+                </div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("home")}
+                <div>
+                  <div class="k">居住地址</div>
+                  <div class="v"><button class="link-btn archive-open" data-to-building="${r.id}" data-address-kind="live">${r.livingAddress || "-"}</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("calendar")}<span>历年参保情况</span></div>
+            <div class="time-axis">
+              ${yearly.map(y => {
+      const typeHtml = y.type === "未参保" ? `<span class="danger-text">未参保</span>` : y.type;
+      const paidHtml = y.paid ? "已缴费" : `<span class="danger-text">未缴费</span>`;
+      return `<div class="time-node"><div><b>${y.year}年</b> · ${typeHtml} · ${paidHtml}</div><div class="mini">参保地：${y.place}</div><div class="mini">${y.note}</div></div>`;
+    }).join("")}
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("walk")}<span>历次动员情况</span></div>
+            <div class="time-axis">
+              ${logs.map(x => `<div class="time-node"><div class="mobilize-line"><b>${x.date}</b> · ${x.worker}</div><div class="mobilize-line mobilize-note">${x.content}</div></div>`).join("")}
+            </div>
+          </div>`;
+    document.getElementById("toHouseholdBtn").onclick = () => openArchive("household", r.id);
+    const archivePhoneToggle = document.getElementById("archivePhoneToggle");
+    const archivePhoneValue = document.getElementById("archivePhoneValue");
+    if (archivePhoneToggle && archivePhoneValue) {
+      archivePhoneToggle.onchange = () => {
+        state.showFullPhone = !!archivePhoneToggle.checked;
+        const _rp = r.phone;
+        archivePhoneValue.textContent = state.showFullPhone ? _rp : maskPhone(_rp);
+      };
+    }
+    els.archiveBody.querySelectorAll("[data-to-enterprise]").forEach(el => {
+      el.onclick = () => openArchive("enterprise", el.dataset.toEnterprise);
+    });
+    els.archiveBody.querySelectorAll("[data-to-building]").forEach(el => {
+      el.onclick = () => openArchive("building", el.dataset.toBuilding, { addressKind: el.dataset.addressKind || "live" });
+    });
+  }
+
+  if (kind === "enterprise") {
+    const e = byId(enterprises, id);
+    if (!e) return;
+    state.archive = { kind, enterpriseId: id };
+    const staff = residents.filter(r => r.employerId === e.id);
+    const staffCurrent = staff.filter(r => r.thisYearType === "职工保" && r.thisYearPaid);
+    const insuredStaff = staffCurrent.length;
+    const unStaff = Math.max(staff.length - insuredStaff, 0);
+    const insuredRate = ratio(insuredStaff, Math.max(staff.length, 1));
+    const unitStatusText = e.staffInsured ? "正常参保" : "未参保";
+    const staffBigDefs = ["单位参保", "个人参保（灵活就业）"];
+    const staffDetailDefs = ["在职职工", "单位退休人员", "灵活就业（一档）", "灵活就业（二档）", "个人退休（一档）", "个人退休（二档）"];
+    const bigStats = staffBigDefs.map(k => ({ key: k, count: staffCurrent.filter(r => (r.staffBigType || "") === k).length }));
+    const detailStats = staffDetailDefs.map(k => ({ key: k, count: staffCurrent.filter(r => (r.staffDetailType || "") === k).length }));
+    const statMonth = Math.max(1, Math.min(12, new Date().getMonth() + 1));
+    const trendData = makeEnterpriseTrendSeries(e, insuredStaff);
+    const staffRows = staff
+      .map(s => {
+        const detail = s.staffDetailType || (s.age >= 55 ? "单位退休人员" : "在职职工");
+        const big = s.staffBigType || (detail.includes("灵活就业") || detail.includes("个人退休") ? "个人参保（灵活就业）" : "单位参保");
+        const jobStatus = detail.includes("退休") ? "退休" : "在职";
+        const isPause = (!s.thisYearPaid) || s.stockChangeType === "停保" || s.pauseFlow === "申请停保";
+        let insureStatusText = "正常参保";
+        let insureStatusLevel = "";
+        if (isPause) {
+          insureStatusText = `停保${unitText(s.duration || 0, "月")}`;
+          insureStatusLevel = "warn";
+        } else if (s.thisYearType === "居民保") {
+          insureStatusText = "转居民保";
+          insureStatusLevel = "danger";
+        } else if (s.thisYearType === "未参保") {
+          insureStatusText = "未参保";
+          insureStatusLevel = "danger";
+        }
+        return { ...s, detail, big, jobStatus, insureStatusText, insureStatusLevel };
+      })
+      .sort((a, b) => {
+        const pa = a.insureStatusLevel === "warn" || a.insureStatusLevel === "danger" ? 1 : 0;
+        const pb = b.insureStatusLevel === "warn" || b.insureStatusLevel === "danger" ? 1 : 0;
+        return pb - pa;
+      });
+    els.archiveTitle.textContent = e.name;
+    els.archiveSub.textContent = `${e.unitType || "企业"} / ${e.industryClass || "-"} / ${e.unitNature || "-"}`;
+    els.archiveBody.innerHTML = `
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("shield")}<span>参保情况</span></div>
+              <span class="stat-time">统计时间：${state.insuranceYear}年${statMonth}月</span>
+            </div>
+            <div class="person-insure-grid">
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>单位参保状态</span></div>
+                <div class="person-insure-value ${e.staffInsured ? "" : "person-insure-alert"}">${unitStatusText}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>企业风险等级</span></div>
+                <div class="person-insure-value ${e.risk === "高" ? "person-insure-alert" : ""}">${e.risk}风险</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>职工参保率</span></div>
+                <div class="person-insure-value">${insuredRate}%</div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("user")}<span>基本信息</span></div>
+            </div>
+            <div class="basic-info-list">
+              <div class="basic-info-item">
+                ${archiveIcon("user")}
+                <div><div class="k">法人代表</div><div class="v">${e.legalPerson || "-"}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("user")}
+                <div><div class="k">联系人</div><div class="v">${e.contactPerson || "-"}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("phone")}
+                <div>
+                  <div class="k">联系电话</div>
+                  <div class="v archive-phone-line">
+                    <span id="archiveEntPhoneValue">${maskPhone(e.phone)}</span>
+                    <label class="archive-phone-toggle"><input type="checkbox" id="archiveEntPhoneToggle" ${state.showFullPhone ? "checked" : ""}/>显示完整手机号</label>
+                  </div>
+                </div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("pin")}
+                <div><div class="k">注册地址</div><div class="v"><button class="link-btn archive-open" data-to-building-by-enterprise="${e.id}">${e.regAddress || "-"}</button></div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("map")}
+                <div><div class="k">管理属地</div><div class="v">${e.managementArea || "-"}</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("card")}<span>当年度职工参保汇总</span></div>
+            <div class="archive-lines">
+              ${lineRow("企业关联职工总人数", unitText(staff.length, "人"))}
+              ${lineRow("职工保正常参保人数", `<button class="staff-normal-trigger staff-jump-trigger" data-ent-staff-filter=\"normal\">${unitText(insuredStaff, "人")}</button>`)}
+              ${lineRow("停保/转保/未参保人数", `<button class="staff-abn-trigger staff-jump-trigger" data-ent-staff-filter=\"abnormal\">${unitText(unStaff, "人")}</button>`)}
+              ${lineRow("职工保正常参保率", `${insuredRate}%`)}
+              <div class="mini" style="margin-top:4px">按大类（占职工保正常参保人数）</div>
+              ${bigStats.map(x => lineRow(x.key, `${unitText(x.count, "人")} · ${ratio(x.count, Math.max(insuredStaff, 1))}%`)).join("")}
+              <div class="mini" style="margin-top:4px">按细类（占职工保正常参保人数）</div>
+              ${detailStats.map(x => lineRow(x.key, `${unitText(x.count, "人")} · ${ratio(x.count, Math.max(insuredStaff, 1))}%`)).join("")}
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("calendar")}<span>企业参保走势</span></div>
+              <span class="stat-time">统计时间：${state.insuranceYear}年${statMonth}月</span>
+            </div>
+            <div class="mini">当年度按月职工保参保人数变化（用于识别异常波动）</div>
+            <div class="trend-wrap">${renderEnterpriseTrendSvg(trendData.vals, trendData.monthNow)}</div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("walk")}<span>企业参保职工名单</span></div>
+            <div class="staff-filter-row" id="enterpriseStaffFilterRow">
+              <button class="staff-filter-chip active" data-ent-staff-filter="all">全部</button>
+              <button class="staff-filter-chip" data-ent-staff-filter="abnormal">异常（停保/转保/未参保）</button>
+              <button class="staff-filter-chip" data-ent-staff-filter="normal">正常参保</button>
+            </div>
+            <div class="mini" id="enterpriseStaffSummary" style="margin-top:6px"></div>
+            <div class="staff-member-list" id="enterpriseStaffList" style="margin-top:6px"></div>
+            <div style="margin-top:8px; display:flex; justify-content:center;">
+              <button class="btn-mini" id="enterpriseStaffMoreBtn" style="display:none">加载更多</button>
+            </div>
+          </div>`;
+    const archiveEntPhoneToggle = document.getElementById("archiveEntPhoneToggle");
+    const archiveEntPhoneValue = document.getElementById("archiveEntPhoneValue");
+    if (archiveEntPhoneToggle && archiveEntPhoneValue) {
+      archiveEntPhoneToggle.onchange = () => {
+        state.showFullPhone = !!archiveEntPhoneToggle.checked;
+        const _ep = e.phone;
+        archiveEntPhoneValue.textContent = state.showFullPhone ? _ep : maskPhone(_ep);
+      };
+    }
+    const staffListEl = document.getElementById("enterpriseStaffList");
+    const staffSummaryEl = document.getElementById("enterpriseStaffSummary");
+    const staffMoreBtn = document.getElementById("enterpriseStaffMoreBtn");
+    const PAGE_SIZE = 20;
+    let staffFilter = "all";
+    let page = 1;
+    function matchesFilter(row, filter) {
+      if (filter === "abnormal") return row.insureStatusLevel === "warn" || row.insureStatusLevel === "danger";
+      if (filter === "normal") return row.insureStatusLevel === "";
+      return true;
+    }
+    function renderStaffList() {
+      const filtered = staffRows.filter(x => matchesFilter(x, staffFilter));
+      const shown = filtered.slice(0, page * PAGE_SIZE);
+      if (staffSummaryEl) staffSummaryEl.textContent = `共 ${filtered.length} 人，当前显示 ${shown.length} 人`;
+      if (staffListEl) {
+        staffListEl.innerHTML = shown.length ? shown.map(s => `
+              <div class="staff-member-item">
+                <div class="staff-member-top">
+                  <button class="link-btn archive-open" data-to-person="${s.id}">${s.name}</button>
+                  <span class="staff-member-state ${s.insureStatusLevel}">${s.insureStatusText}</span>
+                </div>
+                <div class="staff-member-meta">${s.jobStatus} · ${s.big} · ${s.detail}</div>
+              </div>`).join("") : '<div class="mini">暂无匹配职工</div>';
+        staffListEl.querySelectorAll("[data-to-person]").forEach(el => {
+          el.onclick = () => openArchive("person", el.dataset.toPerson);
+        });
+      }
+      if (staffMoreBtn) staffMoreBtn.style.display = shown.length < filtered.length ? "inline-flex" : "none";
+    }
+    const entStaffFilterNodes = els.archiveBody.querySelectorAll("[data-ent-staff-filter]");
+    entStaffFilterNodes.forEach(btn => {
+      btn.onclick = () => {
+        staffFilter = btn.dataset.entStaffFilter || "all";
+        page = 1;
+        els.archiveBody.querySelectorAll("[data-ent-staff-filter].staff-filter-chip").forEach(chip => {
+          chip.classList.toggle("active", chip.dataset.entStaffFilter === staffFilter);
+        });
+        renderStaffList();
+        if (btn.classList.contains("staff-jump-trigger") && staffListEl) {
+          staffListEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      };
+    });
+    if (staffMoreBtn) {
+      staffMoreBtn.onclick = () => {
+        page += 1;
+        renderStaffList();
+      };
+    }
+    renderStaffList();
+    els.archiveBody.querySelectorAll("[data-to-person]").forEach(el => {
+      el.onclick = () => openArchive("person", el.dataset.toPerson);
+    });
+    els.archiveBody.querySelectorAll("[data-to-building-by-enterprise]").forEach(el => {
+      el.onclick = () => openArchive("buildingByEnterprise", el.dataset.toBuildingByEnterprise);
+    });
+  }
+
+  if (kind === "household") {
+    const r = byId(residents, id);
+    if (!r) return;
+    let members = residents.filter(x => x.familyId && x.familyId === r.familyId);
+    if (members.length && !members.some(x => x.familyRole === "户主")) {
+      members = members.map((m, idx) => (idx === 0 ? { ...m, familyRole: "户主" } : m));
+    }
+    const householder = members.find(x => x.familyRole === "户主") || members[0] || r;
+    const insured = members.filter(x => x.thisYearPaid).length;
+    const householdInsuredRate = ratio(insured, Math.max(members.length, 1));
+    const statusTag = insured === members.length ? "全员参保" : (insured === 0 ? "无人参保" : "部分参保");
+    const hasStaff = members.some(x => x.thisYearType === "职工保" && x.thisYearPaid);
+    const hasNewborn = members.some(x => x.keyGroup === "新生儿" || (x.age || 0) <= 1);
+    const hasHardship = members.some(x => x.keyGroup === "资助对象" || !!x.hardshipType);
+    const hukouAddrCount = {};
+    members.forEach(m => {
+      const k = m.hukouAddress || "";
+      if (!k) return;
+      hukouAddrCount[k] = (hukouAddrCount[k] || 0) + 1;
+    });
+    const householdAddress = Object.entries(hukouAddrCount).sort((a, b) => b[1] - a[1])[0]?.[0] || householder.hukouAddress || r.hukouAddress || "-";
+    const managementArea = getManagementAreaFromAddress(householdAddress);
+    els.archiveTitle.textContent = `${householder.name || r.name}-户档案`;
+    els.archiveSub.innerHTML = [
+      insured === 0 ? `<span class="danger-text">无人参保</span>` : statusTag,
+      hasStaff ? "有职工保" : "无职工保",
+      hasNewborn ? renderFocusTag("新生儿") : "",
+      hasHardship ? renderFocusTag("资助对象") : ""
+    ].filter(Boolean).join(" / ");
+    els.archiveBody.innerHTML = `
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("shield")}<span>参保情况</span></div>
+              <span class="stat-time">统计时间：${state.insuranceYear}年度</span>
+            </div>
+            <div class="person-insure-grid">
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>户内人数</span></div>
+                <div class="person-insure-value">${unitText(members.length, "人")}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>已参保人数</span></div>
+                <div class="person-insure-value">${unitText(insured, "人")}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>户参保率</span></div>
+                <div class="person-insure-value">${householdInsuredRate}%</div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("user")}<span>基本信息</span></div>
+            </div>
+            <div class="basic-info-list">
+              <div class="basic-info-item">
+                ${archiveIcon("card")}
+                <div><div class="k">家庭户号</div><div class="v">${r.familyId || "-"}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("user")}
+                <div><div class="k">户主姓名</div><div class="v">${householder.name || "-"}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("phone")}
+                <div>
+                  <div class="k">联系电话（户主）</div>
+                  <div class="v archive-phone-line">
+                    <span id="archiveHousePhoneValue">${maskPhone(householder.phone || r.phone)}</span>
+                    <label class="archive-phone-toggle"><input type="checkbox" id="archiveHousePhoneToggle" ${state.showFullPhone ? "checked" : ""}/>显示完整手机号</label>
+                  </div>
+                </div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("pin")}
+                <div><div class="k">户地址</div><div class="v"><button class="link-btn archive-open" data-to-building="${householder.id || r.id}" data-address-kind="hukou">${householdAddress}</button></div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("map")}
+                <div><div class="k">管理属地</div><div class="v">${managementArea}</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("walk")}<span>户成员组成</span></div>
+            <div class="staff-member-list">
+              ${members.map(m => {
+      const relation = m.familyRole || "成员";
+      const keyTag = m.keyGroup && m.keyGroup !== "无" ? m.keyGroup : "";
+      const keyTagText = keyTag ? renderFocusTag(keyTag) : "";
+      const insureType = m.thisYearType === "职工保"
+        ? `职工保（${m.staffBigType || "单位参保"} / ${m.staffDetailType || "在职职工"}）`
+        : (m.thisYearType === "居民保" ? "居民保" : "未参保");
+      const paused = !m.thisYearPaid && (m.stockChangeType === "停保" || m.pauseFlow === "申请停保");
+      const insureStatus = paused ? `停保${unitText(m.duration || 0, "月")}` : (m.thisYearPaid ? "已参保" : "未参保");
+      const stateCls = paused ? "warn" : (m.thisYearPaid ? "" : "danger");
+      return `
+                  <div class="staff-member-item">
+                    <div class="staff-member-top">
+                      <button class="link-btn archive-open" data-to-person="${m.id}">${m.name}</button>
+                      <span class="staff-member-state ${stateCls}">${insureStatus}</span>
+                    </div>
+                    <div class="staff-member-meta">与户主关系：${relation}${keyTagText ? ` · 重点对象：${keyTagText}` : ""}</div>
+                    <div class="staff-member-meta">参保类型：${insureType}</div>
+                  </div>`;
+    }).join("")}
+            </div>
+          </div>`;
+    els.archiveBody.querySelectorAll("[data-to-person]").forEach(el => {
+      el.onclick = () => openArchive("person", el.dataset.toPerson);
+    });
+    const archiveHousePhoneToggle = document.getElementById("archiveHousePhoneToggle");
+    const archiveHousePhoneValue = document.getElementById("archiveHousePhoneValue");
+    if (archiveHousePhoneToggle && archiveHousePhoneValue) {
+      archiveHousePhoneToggle.onchange = () => {
+        state.showFullPhone = !!archiveHousePhoneToggle.checked;
+        const _ph = householder.phone || r.phone;
+        archiveHousePhoneValue.textContent = state.showFullPhone ? _ph : maskPhone(_ph);
+      };
+    }
+    els.archiveBody.querySelectorAll("[data-to-building]").forEach(el => {
+      el.onclick = () => openArchive("building", el.dataset.toBuilding, { addressKind: el.dataset.addressKind || "live" });
+    });
+  }
+
+  if (kind === "building" || kind === "buildingByEnterprise") {
+    let buildingKey = "";
+    let place = "";
+    let sourceText = "";
+    let members = [];
+    if (kind === "building") {
+      const r = byId(residents, id);
+      if (!r) return;
+      const addressKind = opts.addressKind === "hukou" ? "hukou" : "live";
+      const parsed = parsedResidentAddr(r, addressKind);
+      if (!parsed) return;
+      buildingKey = parsed.buildingKey;
+      place = r.place;
+      sourceText = addressKind === "hukou" ? "按户籍地址归集" : "按居住地址归集";
+      members = residents
+        .map(x => ({ person: x, parsed: parsedResidentAddr(x, addressKind) }))
+        .filter(x => x.parsed && x.parsed.buildingKey === buildingKey)
+        .map(x => ({ ...x.person, _parsedAddr: x.parsed }));
+    } else {
+      const e = byId(enterprises, id);
+      if (!e) return;
+      const parsed = parseStdAddress(e.regAddress);
+      if (!parsed) return;
+      buildingKey = parsed.buildingKey;
+      place = e.place;
+      sourceText = "按企业注册地址归集：同楼企业职工 + 同楼居民";
+      const enterprisesOnBuilding = enterprises
+        .map(x => ({ ent: x, parsed: parseStdAddress(x.regAddress) }))
+        .filter(x => x.parsed && x.parsed.buildingKey === buildingKey);
+      const enterpriseIdSet = new Set(enterprisesOnBuilding.map(x => x.ent.id));
+      const enterpriseParsedMap = new Map(enterprisesOnBuilding.map(x => [x.ent.id, x.parsed]));
+
+      const liveMembers = residents
+        .map(x => ({ person: x, parsed: parsedResidentAddr(x, "live") }))
+        .filter(x => x.parsed && x.parsed.buildingKey === buildingKey)
+        .map(x => ({ ...x.person, _parsedAddr: x.parsed, _memberSource: "live" }));
+
+      const staffMembers = residents
+        .filter(x => enterpriseIdSet.has(x.employerId))
+        .map(x => ({
+          ...x,
+          _parsedAddr: enterpriseParsedMap.get(x.employerId) || parsedResidentAddr(x, "live"),
+          _memberSource: "staff"
+        }))
+        .filter(x => !!x._parsedAddr);
+
+      const memberMap = new Map();
+      liveMembers.forEach(x => memberMap.set(x.id, x));
+      staffMembers.forEach(x => {
+        if (!memberMap.has(x.id)) {
+          memberMap.set(x.id, x);
+          return;
+        }
+        const existed = memberMap.get(x.id);
+        memberMap.set(x.id, {
+          ...existed,
+          _memberSource: existed._memberSource === "live" ? "mixed" : existed._memberSource,
+          _parsedAddr: existed._parsedAddr || x._parsedAddr
+        });
+      });
+      members = [...memberMap.values()];
+    }
+    const byFloor = {};
+    members.forEach(m => {
+      const floorNo = m._parsedAddr ? m._parsedAddr.floorNo : 1;
+      const roomKey = m._parsedAddr ? m._parsedAddr.roomKey : "1层01室";
+      const fk = `F${floorNo}`;
+      byFloor[fk] = byFloor[fk] || {};
+      byFloor[fk][roomKey] = byFloor[fk][roomKey] || [];
+      byFloor[fk][roomKey].push(m);
+    });
+    els.archiveTitle.textContent = buildingKey;
+    const insured = members.filter(x => x.thisYearPaid).length;
+    const insuredRate = ratio(insured, Math.max(members.length, 1));
+    const roomKeys = members.map(x => (x._parsedAddr ? x._parsedAddr.roomKey : ""));
+    const rooms = [...new Set(roomKeys.filter(Boolean))];
+    const floorCount = Object.keys(byFloor).length;
+    const areaType = getBuildingAreaType(buildingKey);
+    const managementArea = getManagementAreaFromBuildingKey(buildingKey);
+    const hasNewborn = members.some(x => x.keyGroup === "新生儿" || (x.age || 0) <= 1);
+    const hasHardship = members.some(x => x.keyGroup === "资助对象" || !!x.hardshipType);
+    const buildingStatus = insured === members.length ? "全员参保" : (insured === 0 ? "无人参保" : "部分参保");
+    els.archiveSub.innerHTML = [
+      areaType,
+      insured === 0 ? `<span class="danger-text">无人参保</span>` : buildingStatus,
+      hasNewborn ? renderFocusTag("新生儿") : "",
+      hasHardship ? renderFocusTag("资助对象") : ""
+    ].filter(Boolean).join(" / ");
+    els.archiveBody.innerHTML = `
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("shield")}<span>参保情况</span></div>
+              <span class="stat-time">统计时间：${state.insuranceYear}年度</span>
+            </div>
+            <div class="person-insure-grid">
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>楼栋总人数</span></div>
+                <div class="person-insure-value">${unitText(members.length, "人")}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>已参保人数</span></div>
+                <div class="person-insure-value">${unitText(insured, "人")}</div>
+              </div>
+              <div class="person-insure-card">
+                <div class="person-insure-head"><span>楼栋参保率</span></div>
+                <div class="person-insure-value">${insuredRate}%</div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="archive-section-head">
+              <div class="h archive-h-icon" style="margin:0">${archiveIcon("user")}<span>基本信息</span></div>
+            </div>
+            <div class="basic-info-list">
+              <div class="basic-info-item">
+                ${archiveIcon("home")}
+                <div><div class="k">楼栋楼层数</div><div class="v">${unitText(floorCount, "层")}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("card")}
+                <div><div class="k">楼栋房屋数</div><div class="v">${unitText(rooms.length, "户")}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("pin")}
+                <div><div class="k">楼栋区域类型</div><div class="v">${areaType}</div></div>
+              </div>
+              <div class="basic-info-item">
+                ${archiveIcon("map")}
+                <div><div class="k">管理属地</div><div class="v">${managementArea}</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="archive-section">
+            <div class="h archive-h-icon">${archiveIcon("home")}<span>楼栋参保情况</span></div>
+            ${Object.keys(byFloor).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))).map(fk => {
+      const floorRoomMap = byFloor[fk];
+      const floorMembers = Object.values(floorRoomMap).flat();
+      return `<div class="archive-section" style="margin-top:8px">
+                <div class="h">${fk.slice(1)}层（${unitText(floorMembers.length, "人")}）</div>
+                ${Object.keys(floorRoomMap).sort((a, b) => {
+        const pa = parseStdAddress(`${buildingKey}${a}`) || { roomNo: 0 };
+        const pb = parseStdAddress(`${buildingKey}${b}`) || { roomNo: 0 };
+        return pa.roomNo - pb.roomNo;
+      }).map(roomKey => {
+        const list = floorRoomMap[roomKey];
+        const paid = list.filter(x => x.thisYearPaid).length;
+        return `<div class="room-card" data-room="${fk}-${roomKey}">
+                    <div class="room-head">
+                      <button class="link-btn archive-open">房屋 ${roomKey}</button>
+                      <span class="mini">${unitText(list.length, "人")} · 已参保${unitText(paid, "人")}</span>
+                    </div>
+                    <div class="room-detail">
+                      <div class="mini">同屋参保汇总：参保率 ${ratio(paid, Math.max(list.length, 1))}%</div>
+                      <div class="archive-lines" style="margin-top:4px">
+                        ${list.map(p => {
+          const isNewborn = p.keyGroup === "新生儿" || (p.age || 0) <= 1;
+          const isHardship = p.keyGroup === "资助对象" || !!p.hardshipType;
+          const insureText = formatInsuranceDisplay(p.thisYearType, p.thisYearPaid);
+          const newbornTag = isNewborn ? ` · ${renderFocusTag("新生儿", "tag")}` : "";
+          const hardshipTag = isHardship ? ` · ${renderFocusTag("资助对象", "tag")}` : "";
+          return `<div class="archive-line">
+                            <button class="link-btn archive-open" data-to-person="${p.id}">${p.name}</button>
+                            <span>${insureText}${newbornTag}${hardshipTag}</span>
+                          </div>`;
+        }).join("")}
+                      </div>
+                    </div>
+                  </div>`;
+      }).join("")}
+              </div>`;
+    }).join("")}
+          </div>`;
+    els.archiveBody.querySelectorAll("[data-room]").forEach(el => {
+      el.onclick = () => el.classList.toggle("open");
+    });
+    els.archiveBody.querySelectorAll("[data-to-person]").forEach(el => {
+      el.onclick = (e) => {
+        e.stopPropagation();
+        openArchive("person", el.dataset.toPerson);
+      };
+    });
+  }
+  els.archiveModal.classList.add("show");
+  document.body.classList.add("page-lock");
+}
+function closeArchive() {
+  els.archiveModal.classList.remove("show");
+  if (!els.drawer.classList.contains("show")) document.body.classList.remove("page-lock");
+}
+
+function closeDrawer() {
+  closeArchive();
+  els.drawer.classList.remove("show");
+  els.condPanel.classList.remove("show");
+  document.body.classList.remove("page-lock");
+}
+// syncRoleChips / syncLevelChips 已移除（空函数残留清理）
+
+function render() {
+  applyPermissionGuard();
+  const node = currentNode();
+  const p = currentProfile();
+  els.userNameText.textContent = `当前用户：${p.userName}`;
+  els.unitText.textContent = `所在单位：${p.unit}`;
+  renderSelectors();
+  els.leaderPanel.classList.toggle("active", state.role === "leader");
+  els.workerPanel.classList.toggle("active", state.role === "worker");
+  els.leaderSectionNav.style.display = state.role === "leader" ? "flex" : "none";
+  if (state.role === "leader") {
+    renderOverview(node);
+    renderMap();
+    renderStock(node);
+    renderStructure(node);
+    renderHousehold(node);
+    renderKey(node);
+    renderLoss(node);
+    renderStaff(node);
+    renderRisk(node);
+  } else {
+    renderWorker(node);
+  }
+}
+
+document.getElementById("drawerClose").onclick = closeDrawer;
+document.getElementById("archiveClose").onclick = closeArchive;
+document.getElementById("backLoginBtn").onclick = () => { location.href = "./login.html"; };
+els.overlay.onclick = closeDrawer;
+els.levelSelect.onchange = () => { state.level = els.levelSelect.value; render(); };
+els.yearSelect.onchange = async () => {
+  state.insuranceYear = Number(els.yearSelect.value);
+  const ok = await loadBootstrapFromApi();
+  if (!ok) {
+    console.warn("[API] 年度切换未获取到后端数据，继续使用当前内存数据渲染。");
+  }
+  render();
+};
+els.streetSelect.onchange = () => { state.street = els.streetSelect.value; state.village = getStreetObj().villages[0].name; render(); };
+els.villageSelect.onchange = () => { state.village = els.villageSelect.value; render(); };
+els.drawerType.onchange = () => { updateQueryPlaceholders(); renderConditionPanel(); renderDrawerList(); };
+els.conditionBtn.onclick = () => { renderConditionPanel(); els.condPanel.classList.add("show"); };
+els.condApply.onclick = () => { els.condPanel.classList.remove("show"); renderDrawerList(); };
+els.condReset.onclick = () => { state.selectedTags = []; renderConditionPanel(); renderDrawerList(); };
+els.searchName.oninput = renderDrawerList;
+els.searchSecond.oninput = renderDrawerList;
+els.searchAddress.oninput = renderDrawerList;
+els.phoneToggle.onchange = () => { state.showFullPhone = !!els.phoneToggle.checked; renderDrawerList(); };
+document.querySelectorAll("#leaderSectionNav .nav-chip").forEach(btn => {
+  btn.onclick = () => {
+    const target = document.getElementById(btn.dataset.target);
+    if (!target) return;
+    const navH = els.leaderSectionNav ? els.leaderSectionNav.getBoundingClientRect().height : 0;
+    const top = target.getBoundingClientRect().top + window.pageYOffset - navH - 12;
+    window.scrollTo({ top, behavior: "smooth" });
+  };
+});
+document.getElementById("navTopBtn").onclick = () => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+async function initApp() {
+  const q = new URLSearchParams(location.search);
+  const id = q.get("identity");
+  const session = JSON.parse(localStorage.getItem("dashboard_session") || "{}");
+  const sessionIdentity = session.identity;
+  const initialIdentity =
+    (id && identityProfiles[id] ? id : null) ||
+    (sessionIdentity && identityProfiles[sessionIdentity] ? sessionIdentity : null);
+
+  if (!initialIdentity) {
+    location.href = "./login.html";
+    return;
+  }
+
+  state.identity = initialIdentity;
+  const ok = await loadBootstrapFromApi();
+  if (!ok) {
+    console.warn("[API] 启动未获取到后端数据，使用本地模拟数据渲染。");
+  }
+  render();
+}
+
+initApp();
