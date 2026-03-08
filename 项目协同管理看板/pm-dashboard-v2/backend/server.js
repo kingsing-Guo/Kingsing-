@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const db = require('./db');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -8,149 +9,180 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// 纯内存数据存储 (重启服务器后数据会重置)
-let store = {
-    projectInfo: {
-        id: 1,
-        name: '未命名项目',
-        intro: '暂无项目简介说明。'
-    },
-    modules: [],
-    weeklyReports: [],
-    parsedTree: null
-};
-
 // ================= Parsed Tree =================
-app.get('/api/parsed-tree', (req, res) => {
-    res.json({ ok: true, data: store.parsedTree });
+app.get('/api/parsed-tree', async (req, res) => {
+    try {
+        const tree = await db.getParsedTree();
+        res.json({ ok: true, data: tree });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
 });
 
-app.post('/api/parsed-tree', (req, res) => {
-    store.parsedTree = req.body.tree;
-    res.json({ ok: true });
+app.post('/api/parsed-tree', async (req, res) => {
+    try {
+        await db.saveParsedTree(req.body.tree);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
 });
 
 // ================= Project Info =================
-app.get('/api/project-info', (req, res) => {
-    res.json({ ok: true, data: store.projectInfo });
+app.get('/api/project-info', async (req, res) => {
+    try {
+        const info = await db.getProjectInfo();
+        res.json({ ok: true, data: info });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
 });
 
-app.put('/api/project-info', (req, res) => {
-    const data = req.body;
-    // 过滤掉不可修改的字段
-    const updateData = { ...data };
-    delete updateData.id;
-
-    store.projectInfo = { ...store.projectInfo, ...updateData };
-    res.json({ ok: true });
+app.put('/api/project-info', async (req, res) => {
+    try {
+        await db.updateProjectInfo(req.body);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
 });
 
 // ================= Modules =================
-app.get('/api/modules', (req, res) => {
-    const sorted = [...store.modules].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-    res.json({ ok: true, data: sorted });
-});
-
-app.post('/api/modules', (req, res) => {
-    const item = req.body;
-    const id = item.id || Date.now().toString(36) + Math.random().toString(36).substr(2);
-    const newModule = {
-        id,
-        name: item.name || '',
-        subsystem: item.subsystem || '',
-        chapter: item.chapter || '',
-        strategyType: item.strategyType || '',
-        progress: item.progress || 0,
-        deadline: item.deadline || '',
-        tender: item.tender || '',
-        strategy: item.strategy || '',
-        modifiedModules: item.modifiedModules || '',
-        link: item.link || '',
-        status: item.status || '进行中',
-        displayOrder: item.order || item.displayOrder || 0,
-        issues: item.issues || [],
-        feedbackGroups: item.feedbackGroups || [],
-        docs: item.docs || [],
-        history: item.history || [],
-        updateTime: item.updateTime || ''
-    };
-    store.modules.push(newModule);
-    res.json({ ok: true, id });
-});
-
-app.put('/api/modules/:id', (req, res) => {
-    const id = req.params.id;
-    const data = req.body;
-
-    const index = store.modules.findIndex(m => m.id === id);
-    if (index !== -1) {
-        const updateData = { ...data };
-        if ('order' in updateData) {
-            updateData.displayOrder = updateData.order;
-        }
-        store.modules[index] = { ...store.modules[index], ...updateData };
+app.get('/api/modules', async (req, res) => {
+    try {
+        const modules = await db.getModules();
+        res.json({ ok: true, data: modules });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
     }
-
-    res.json({ ok: true });
 });
 
-app.patch('/api/modules/:id', (req, res) => {
-    const id = req.params.id;
-    const data = req.body;
-    const index = store.modules.findIndex(m => m.id === id);
-    if (index !== -1) {
-        store.modules[index] = { ...store.modules[index], ...data };
+app.post('/api/modules', async (req, res) => {
+    try {
+        const id = await db.addModule(req.body);
+        res.json({ ok: true, id });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
     }
-    res.json({ ok: true });
 });
 
-app.post('/api/modules/batch', (req, res) => {
-    const items = req.body.items || [];
-    for (let item of items) {
-        const doc = store.modules.find(m => m.id === item.id);
-        if (doc) {
-            doc.displayOrder = item.order;
-            doc.subsystem = item.subsystem;
-        }
+app.put('/api/modules/:id', async (req, res) => {
+    try {
+        await db.updateModule(req.params.id, req.body);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
     }
-    res.json({ ok: true });
 });
 
-app.delete('/api/modules/:id', (req, res) => {
-    store.modules = store.modules.filter(m => m.id !== req.params.id);
-    res.json({ ok: true });
+app.patch('/api/modules/:id', async (req, res) => {
+    try {
+        await db.updateModule(req.params.id, req.body);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
 });
 
-app.post('/api/modules/delete-all', (req, res) => {
-    store.modules = [];
-    res.json({ ok: true });
+app.post('/api/modules/batch', async (req, res) => {
+    try {
+        await db.batchUpdateOrder(req.body.items || []);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.delete('/api/modules/:id', async (req, res) => {
+    try {
+        await db.deleteModule(req.params.id);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.post('/api/modules/delete-all', async (req, res) => {
+    try {
+        await db.deleteAllModules();
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
 });
 
 // ================= Weekly Reports =================
-app.get('/api/weekly-reports', (req, res) => {
-    const sorted = [...store.weeklyReports].sort((a, b) => {
-        const dateA = new Date(a.uploadTime).getTime() || 0;
-        const dateB = new Date(b.uploadTime).getTime() || 0;
-        return dateB - dateA;
-    });
-    res.json({ ok: true, data: sorted });
+app.get('/api/weekly-reports', async (req, res) => {
+    try {
+        const reports = await db.getWeeklyReports();
+        res.json({ ok: true, data: reports });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
 });
 
-app.post('/api/weekly-reports', (req, res) => {
-    const item = req.body;
-    const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
-    const report = {
-        id,
-        weekNum: item.weekNum,
-        name: item.name,
-        uploadTime: item.uploadTime,
-        url: item.url,
-        fileName: item.fileName
-    };
-    store.weeklyReports.push(report);
-    res.json({ ok: true, id });
+app.post('/api/weekly-reports', async (req, res) => {
+    try {
+        const id = await db.addWeeklyReport(req.body);
+        res.json({ ok: true, id });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ================= Users =================
+app.get('/api/users', async (req, res) => {
+    try {
+        const list = await db.getUsers();
+        res.json({ ok: true, data: list });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.post('/api/users', async (req, res) => {
+    try {
+        const id = await db.addUser(req.body);
+        res.json({ ok: true, id });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.delete('/api/users/:id', async (req, res) => {
+    try {
+        await db.deleteUser(req.params.id);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.put('/api/users/:id/password', async (req, res) => {
+    try {
+        const { password } = req.body;
+        await db.resetUserPassword(req.params.id, password);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await db.login(username, password);
+        if (user) {
+            res.json({ ok: true, user });
+        } else {
+            res.json({ ok: false, message: '账号或密码错误' });
+        }
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
 });
 
 app.listen(port, () => {
-    console.log(`PM Dashboard Backend API (Memory Mode) listening at http://localhost:${port}`);
+    const mode = process.env.DB_TYPE === 'mysql' ? 'MySQL Mode' : 'Memory Mode';
+    console.log(`PM Dashboard Backend API (${mode}) listening at http://localhost:${port}`);
 });

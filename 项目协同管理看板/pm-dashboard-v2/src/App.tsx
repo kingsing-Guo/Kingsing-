@@ -5,6 +5,7 @@ import * as Icons from '@ant-design/icons';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
 import ModuleParser from './components/ModuleParser';
+import SystemGuide from './components/SystemGuide';
 
 const API_BASE = 'http://localhost:3000/api';
 
@@ -16,7 +17,7 @@ const {
     CheckCircleOutlined, UserOutlined, ExportOutlined, LockOutlined,
     UploadOutlined, MenuUnfoldOutlined, MenuFoldOutlined,
     ClearOutlined, DragOutlined, AlertOutlined,
-    InfoCircleOutlined, AuditOutlined, SettingOutlined
+    InfoCircleOutlined, AuditOutlined, SettingOutlined, KeyOutlined, QuestionCircleOutlined
 } = Icons;
 
 
@@ -31,17 +32,36 @@ const ALLOWED_EXTS = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', 
 
 // --- 子组件 ---
 const LoginView = ({ onLogin, projectInfo }: any) => {
-    const [role, setRole] = useState('team');
     const [loading, setLoading] = useState(false);
-    const handleSubmit = () => { setLoading(true); setTimeout(() => { setLoading(false); onLogin(role); }, 600); };
+    const [form] = Form.useForm();
+    const handleSubmit = async (values: any) => {
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(values)
+            });
+            const data = await res.json();
+            if (data.ok) {
+                onLogin(data.user);
+            } else {
+                message.error(data.message || '登录失败');
+            }
+        } catch (err) {
+            message.error('连接服务器失败');
+        } finally {
+            setLoading(false);
+        }
+    };
     return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-            <div className="bg-white/10 backdrop-blur-md w-full max-w-4xl rounded-2xl shadow-2xl flex overflow-hidden border border-white/20 fade-in">
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans">
+            <div className="bg-white/10 backdrop-blur-md w-full max-w-5xl rounded-2xl shadow-2xl flex overflow-hidden border border-white/20 fade-in">
                 <div className="flex-1 p-12 bg-gradient-to-br from-blue-600 to-indigo-800 flex flex-col justify-center relative overflow-hidden hidden md:flex">
                     <div className="mb-12">
                         <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><SafetyOutlined className="text-white text-3xl" /></div>
-                        <h1 className="text-3xl font-bold text-white mb-2">项目建设情况进展看板</h1>
-                        <h2 className="text-xl text-white/80 font-medium italic uppercase tracking-wider">{projectInfo?.name || '项目尚未命名'}</h2>
+                        <h1 className="text-3xl font-bold text-white mb-3">项目建设情况进展看板</h1>
+                        <h2 className="text-lg text-white/90 font-medium italic uppercase tracking-wider leading-relaxed">{projectInfo?.name || '项目尚未命名'}</h2>
                     </div>
                     <div className="space-y-6 text-blue-50">
                         <div className="flex items-center gap-4"><CheckCircleOutlined /><span>多方实时对齐 需求闭环追踪</span></div>
@@ -51,16 +71,17 @@ const LoginView = ({ onLogin, projectInfo }: any) => {
                 </div>
                 <div className="flex-1 bg-white p-12 flex flex-col justify-center">
                     <div className="mb-10 text-center"><h3 className="text-2xl font-bold text-slate-800 m-0">安全登录入口</h3><div className="w-12 h-1 bg-blue-600 mx-auto mt-3 rounded-full"></div></div>
-                    <Form layout="vertical" onFinish={handleSubmit}>
-                        <Form.Item label="登录身份" className="mb-6">
-                            <Radio.Group value={role} onChange={e => setRole(e.target.value)} buttonStyle="solid" className="w-full flex">
-                                <Radio.Button value="partyA" className="flex-1 text-center">甲方负责人</Radio.Button>
-                                <Radio.Button value="team" className="flex-1 text-center">项目组专家</Radio.Button>
-                            </Radio.Group>
+                    <Form form={form} layout="vertical" onFinish={handleSubmit}>
+                        <Form.Item name="username" rules={[{ required: true, message: '请输入账号' }]} initialValue="admin">
+                            <Input prefix={<UserOutlined />} placeholder="账号 (admin)" size="large" />
                         </Form.Item>
-                        <Form.Item name="username" initialValue="admin"><Input prefix={<UserOutlined />} placeholder="请输入账号" size="large" /></Form.Item>
-                        <Form.Item name="password" initialValue="123456"><Input.Password prefix={<LockOutlined />} placeholder="请输入密码" size="large" /></Form.Item>
-                        <Button type="primary" htmlType="submit" size="large" block loading={loading} className="h-12 bg-blue-600 font-bold">同步进入看板</Button>
+                        <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]} initialValue="123456">
+                            <Input.Password prefix={<LockOutlined />} placeholder="密码 (123456)" size="large" />
+                        </Form.Item>
+                        <Button type="primary" htmlType="submit" size="large" block loading={loading} className="h-12 bg-blue-600 font-bold mt-4 shadow-lg shadow-blue-100">立即登录</Button>
+                        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+                            <span className="text-slate-400 text-xs">演示说明：系统已开启 MySQL/Memory 真实账户验证</span>
+                        </div>
                     </Form>
                 </div>
             </div>
@@ -68,7 +89,7 @@ const LoginView = ({ onLogin, projectInfo }: any) => {
     );
 };
 
-const ListView = ({ modules, stats, filterMode, onFilterChange, onSelect, onAdd, onImport, onExport, onDelete, onDeleteAll, onReorderModules, onReorderSubsystems, searchText, onSearchChange, userRole, onLogout, onOpenProjectInfo, onOpenWeeklyReports, onOpenAllDocs, onOpenParser, projectInfo, weeklyReportCount, strategyOptions }: any) => {
+const ListView = ({ modules, stats, filterMode, onFilterChange, onSelect, onAdd, onImport, onExport, onDelete, onDeleteAll, onReorderModules, onReorderSubsystems, searchText, onSearchChange, user, userRole, onLogout, onChangePassword, onOpenProjectInfo, onOpenWeeklyReports, onOpenAllDocs, onOpenParser, onOpenGuide, projectInfo, weeklyReportCount, strategyOptions }: any) => {
     const [displayMode, setDisplayMode] = useState('card');
     const [draggedSubsystem, setDraggedSubsystem] = useState<string | null>(null);
 
@@ -179,12 +200,17 @@ const ListView = ({ modules, stats, filterMode, onFilterChange, onSelect, onAdd,
                     </Space>
                 </div>
                 <div className="flex gap-4 items-center">
-                    <Input prefix={<SearchOutlined />} placeholder="搜索模块..." className="w-64 rounded-lg bg-slate-100 border-none h-10" value={searchText} onChange={e => onSearchChange(e.target.value)} />
+                    <Button type="link" onClick={onOpenGuide} icon={<QuestionCircleOutlined />} className="text-slate-500 hover:text-blue-600 font-bold border-none shadow-none hidden sm:inline-flex text-xs">系统操作指南</Button>
                     <div className="flex items-center gap-3 px-4 py-1.5 bg-white rounded-full border border-slate-200 shadow-sm ml-2">
                         <Avatar size="small" icon={<UserOutlined />} className="bg-blue-600" />
-                        <div className="text-left leading-tight"><div className="text-xs font-bold text-slate-700">{userRole === 'partyA' ? '王建国 (甲方负责人)' : '李志强 (项目组专家)'}</div><div className="text-[10px] text-green-500 font-medium">数据实时同步中</div></div>
+                        <div className="text-left leading-tight">
+                            <div className="text-xs font-bold text-slate-700">{user?.realName || '已登录用户'}</div>
+                            <div className="text-[10px] text-slate-400 font-medium">{userRole === 'team' ? '项目组/专家' : (userRole === 'supervisor' ? '监理' : '甲方负责人')}</div>
+                        </div>
                         <Divider type="vertical" />
-                        <Button type="link" size="small" danger onClick={onLogout} className="p-0 text-[10px]">退出</Button>
+                        <Button type="link" size="small" onClick={() => onChangePassword(user)} className="p-0 text-xs text-blue-500 font-bold">修改密码</Button>
+                        <Divider type="vertical" />
+                        <Button type="link" size="small" danger onClick={onLogout} className="p-0 text-xs font-medium border-none shadow-none">退出</Button>
                     </div>
                 </div>
             </div>
@@ -264,6 +290,7 @@ const ListView = ({ modules, stats, filterMode, onFilterChange, onSelect, onAdd,
 
             <div className="flex justify-between items-center gap-3 mb-4 p-3 bg-white shadow-sm rounded-xl">
                 <Space size="large">
+                    <Input prefix={<SearchOutlined />} placeholder="搜索模块..." className="w-64 rounded-full bg-slate-50 border border-slate-200" value={searchText} onChange={e => onSearchChange(e.target.value)} allowClear />
                     <Radio.Group value={displayMode} onChange={e => setDisplayMode(e.target.value)} buttonStyle="solid">
                         <Radio.Button value="card">卡片视图</Radio.Button>
                         <Radio.Button value="table">表格视图</Radio.Button>
@@ -510,7 +537,7 @@ const DetailView = ({ current, onBack, onEdit, onToggleIssue, onAddIssue, onOpen
                         </div>
                     </Card>
                     <Card id="feedback-anchor" title={sectionTitle(<MessageOutlined />, "用户反馈与意见", "text-blue-500")}>
-                        <div className="mb-6"><Input.Search size="large" placeholder={userRole === 'partyA' ? "提交建议..." : "针对最新反馈进行回复..."} enterButton={userRole === 'partyA' ? '提交' : '回复'} value={feedbackInput} onChange={e => setFeedbackInput(e.target.value)} onSearch={(v) => { if (v.trim()) { onSubmitInteraction(v); setFeedbackInput(''); } }} disabled={userRole === 'team' && !current.feedbackGroups?.length} /></div>
+                        <div className="mb-6"><Input.Search size="large" placeholder={(userRole === 'partyA' || userRole === 'supervisor') ? "提交建议..." : "针对最新反馈进行回复..."} enterButton={(userRole === 'partyA' || userRole === 'supervisor') ? '提交' : '回复'} value={feedbackInput} onChange={e => setFeedbackInput(e.target.value)} onSearch={(v) => { if (v.trim()) { onSubmitInteraction(v); setFeedbackInput(''); } }} disabled={userRole === 'team' && !current.feedbackGroups?.length} /></div>
                         <div className="max-h-[400px] overflow-auto custom-scroll pr-2">
                             <Timeline items={(current.feedbackGroups || []).map(g => ({ color: 'green', children: (<div className="interaction-thread"><div><div className="flex justify-between items-center mb-1"><Tag color="green" className="text-[10px]">甲方反馈</Tag><span className="text-[10px] text-slate-300 italic">{g.partyA.date}</span></div><div className="text-sm font-medium text-slate-700">{g.partyA.content}</div></div>{g.replies?.map((r, ri) => (<div key={ri} className="mt-3 pt-3 border-t border-slate-50"><div className="flex justify-between items-center mb-1"><Tag color="blue" className="text-[10px]">项目组回复</Tag><span className="text-[10px] text-slate-300 italic">{r.date}</span></div><div className="text-sm text-slate-500">{r.content}</div></div>))}</div>) }))} />
                         </div>
@@ -539,6 +566,8 @@ const App = () => {
     const [view, setView] = useState('login');
     const [userRole, setUserRole] = useState('team');
     const [user, setUser] = useState<any>(null);
+    const [userList, setUserList] = useState<any[]>([]);
+
     const [modules, setModules] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -556,7 +585,11 @@ const App = () => {
     const [isWeeklyReportModalOpen, setIsWeeklyReportModalOpen] = useState(false);
     const [isAllDocsModalOpen, setIsAllDocsModalOpen] = useState(false);
     const [allDocsSearch, setAllDocsSearch] = useState('');
+    const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
     const [isEditingProjectInfo, setIsEditingProjectInfo] = useState(false);
+    const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
+    const [pwdTargetUser, setPwdTargetUser] = useState<any>(null);
+    const [infoActiveMenu, setInfoActiveMenu] = useState('core');
     const [projectInfo, setProjectInfo] = useState<any>({});
     const [weeklyReports, setWeeklyReports] = useState<any[]>([]);
     const [importFileList, setImportFileList] = useState<any[]>([]);
@@ -569,6 +602,7 @@ const App = () => {
     const [docForm] = Form.useForm();
     const [infoForm] = Form.useForm();
     const [weeklyForm] = Form.useForm();
+    const [pwdForm] = Form.useForm();
     const strategyTypeWatcher = Form.useWatch('strategyType', form);
 
     const current = useMemo(() => modules.find(m => m.id === selectedId) || null, [modules, selectedId]);
@@ -589,9 +623,6 @@ const App = () => {
 
     const STRATEGY_OPTIONS = useMemo(() => projectInfo.strategies || DEFAULT_STRATEGY_OPTIONS, [projectInfo.strategies]);
 
-    const handleLogin = (r: any) => { setUserRole(r); sessionStorage.setItem('board_user_role', r); sessionStorage.setItem('board_is_logged', 'true'); setView('list'); };
-    const handleLogout = () => { sessionStorage.clear(); setView('login'); };
-
     const onInfoValuesChange = (changedValues, allValues) => {
         if (changedValues.trialStart || changedValues.trialPeriod) {
             const start = allValues.trialStart;
@@ -605,15 +636,76 @@ const App = () => {
 
     const SEED_DATA = [{ subsystem: '基础支撑子系统', name: '用户管理', chapter: '第一节', status: '进行中', progress: 35, deadline: '2026-03-12', order: 0, link: '', strategyType: 'customization' }];
 
-    useEffect(() => {
-        const savedRole = sessionStorage.getItem('board_user_role');
-        if (savedRole) setUserRole(savedRole);
-        setUser({ logged: true });
-        if (sessionStorage.getItem('board_is_logged')) setView('list');
-    }, []);
-
     const [isCompositionModalOpen, setIsCompositionModalOpen] = useState(false);
     const [compExpandedKeys, setCompExpandedKeys] = useState<string[]>([]);
+
+    useEffect(() => {
+        const savedUser = sessionStorage.getItem('board_user');
+        if (savedUser) {
+            const u = JSON.parse(savedUser);
+            setUser(u);
+            setUserRole(u.role);
+            setView('list');
+        }
+    }, []);
+
+    const handleLogin = (u: any) => {
+        setUser(u);
+        setUserRole(u.role);
+        sessionStorage.setItem('board_user', JSON.stringify(u));
+        setView('list');
+    };
+    const handleLogout = () => { sessionStorage.clear(); setView('login'); setUser(null); };
+
+    const fetchUsers = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/users`);
+            const data = await res.json();
+            if (data.ok) setUserList(data.data);
+        } catch (err) { console.error('获取用户列表失败'); }
+    };
+
+    const handleAddUser = async (v: any) => {
+        try {
+            await fetch(`${API_BASE}/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) });
+            message.success('创建用户成功');
+            fetchUsers();
+        } catch (err) { message.error('创建用户异常'); }
+    };
+
+    const handleOpenPwdModal = (targetUser: any) => {
+        setPwdTargetUser(targetUser);
+        setIsPwdModalOpen(true);
+        pwdForm.resetFields();
+    };
+
+    const handleChangePassword = async (values: any) => {
+        if (!pwdTargetUser) return;
+        try {
+            const res = await fetch(`${API_BASE}/users/${pwdTargetUser.id}/password`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: values.newPassword })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                message.success('密码修改成功');
+                setIsPwdModalOpen(false);
+            } else {
+                message.error(data.error || '修改失败');
+            }
+        } catch (e) {
+            message.error('网络错误');
+        }
+    };
+
+    const handleDeleteUser = async (uid: any) => {
+        try {
+            await fetch(`${API_BASE}/users/${uid}`, { method: 'DELETE' });
+            message.success('已移除用户');
+            fetchUsers();
+        } catch (err) { message.error('操作失败'); }
+    };
 
     const fetchData = async () => {
         try {
@@ -640,7 +732,11 @@ const App = () => {
     useEffect(() => {
         if (!user) return;
         fetchData();
-        const timer = setInterval(fetchData, 3000);
+        fetchUsers();
+        const timer = setInterval(() => {
+            fetchData();
+            fetchUsers();
+        }, 3000);
         return () => clearInterval(timer);
     }, [user]);
 
@@ -854,7 +950,7 @@ const App = () => {
             {view === 'login' ? <LoginView onLogin={handleLogin} projectInfo={projectInfo} /> : (
                 view === 'list' ? (
                     <ListView
-                        modules={modules} stats={stats} filterMode={filterMode} onFilterChange={setFilterMode} searchText={searchText} onSearchChange={setSearchText} onSelect={(id, anchor) => { setSelectedId(id); setTargetAnchor(anchor || null); setView('detail'); }} onLogout={handleLogout} userRole={userRole}
+                        modules={modules} stats={stats} filterMode={filterMode} onFilterChange={setFilterMode} searchText={searchText} onSearchChange={setSearchText} onSelect={(id: any, anchor: any) => { setSelectedId(id); setTargetAnchor(anchor || null); setView('detail'); }} onLogout={handleLogout} onChangePassword={handleOpenPwdModal} user={user} userRole={userRole} onOpenGuide={() => setIsGuideModalOpen(true)}
                         onAdd={() => { setSelectedId(null); setIsEditModalOpen(true); form.resetFields(); }}
                         onImport={() => setIsImportModalOpen(true)}
                         onExport={() => { setSelectedExportIds(modules.map(m => m.id)); setIsExportModalOpen(true); }}
@@ -890,32 +986,33 @@ const App = () => {
                     view === 'parser' ? (
                         <ModuleParser onBack={() => setView('list')} onSync={fetchData} modules={modules} userRole={userRole} strategyOptions={STRATEGY_OPTIONS} />
                     ) : (
-                        <DetailView current={current} targetAnchor={targetAnchor} onBack={() => { setView('list'); setTargetAnchor(null); }} onEdit={() => { if (!current) return; form.setFieldsValue({ ...current, deadline: current.deadline ? dayjs(current.deadline) : null }); setIsEditModalOpen(true); }} onOpenComposition={() => setIsCompositionModalOpen(true)} onAddHistory={(v: any) => current && updateSubItem(selectedId, 'history', [{ time: dayjs().format('YYYY/M/D HH:mm'), content: `[${userRole === 'team' ? '项目组' : '甲方'}] ${v}` }, ...(current.history || [])])} onAddIssue={(v: any) => current && updateSubItem(selectedId, 'issues', [{ id: Date.now(), title: v, status: 'pending', date: dayjs().format('YYYY/M/D') }, ...(current.issues || [])])} onToggleIssue={(iid: any) => current && updateSubItem(selectedId, 'issues', (current.issues || []).map(i => i.id === iid ? { ...i, status: i.status === 'done' ? 'pending' : 'done', solvedDate: i.status === 'done' ? '' : dayjs().format('YYYY/M/D') } : i))} onDeleteDoc={(idx: any) => current && updateSubItem(selectedId, 'docs', (current.docs || []).filter((_, i) => i !== idx))} onOpenDocModal={() => setIsDocModalOpen(true)} userRole={userRole} feedbackProps={{ onSubmitInteraction: (v: any) => { if (!current) return; const time = dayjs().format('YYYY/M/D HH:mm'); if (userRole === 'partyA') updateSubItem(selectedId, 'feedbackGroups', [{ partyA: { content: v, date: time }, replies: [] }, ...(current.feedbackGroups || [])]); else if (current.feedbackGroups?.length) { const groups = [...current.feedbackGroups]; groups[0].replies.push({ content: v, date: time }); updateSubItem(selectedId, 'feedbackGroups', groups); } } }} strategyOptions={STRATEGY_OPTIONS} />
+                        <DetailView current={current} targetAnchor={targetAnchor} onBack={() => { setView('list'); setTargetAnchor(null); }} onEdit={() => { if (!current) return; form.setFieldsValue({ ...current, deadline: current.deadline ? dayjs(current.deadline) : null }); setIsEditModalOpen(true); }} onOpenComposition={() => setIsCompositionModalOpen(true)} onAddHistory={(v: any) => current && updateSubItem(selectedId, 'history', [{ time: dayjs().format('YYYY/M/D HH:mm'), content: `[${userRole === 'team' ? '项目组' : (userRole === 'supervisor' ? '监理' : '甲方')}] ${v}` }, ...(current.history || [])])} onAddIssue={(v: any) => current && updateSubItem(selectedId, 'issues', [{ id: Date.now(), title: v, status: 'pending', date: dayjs().format('YYYY/M/D') }, ...(current.issues || [])])} onToggleIssue={(iid: any) => current && updateSubItem(selectedId, 'issues', (current.issues || []).map(i => i.id === iid ? { ...i, status: i.status === 'done' ? 'pending' : 'done', solvedDate: i.status === 'done' ? '' : dayjs().format('YYYY/M/D') } : i))} onDeleteDoc={(idx: any) => current && updateSubItem(selectedId, 'docs', (current.docs || []).filter((_, i) => i !== idx))} onOpenDocModal={() => setIsDocModalOpen(true)} userRole={userRole} feedbackProps={{ onSubmitInteraction: (v: any) => { if (!current) return; const time = dayjs().format('YYYY/M/D HH:mm'); if (userRole === 'partyA' || userRole === 'supervisor') updateSubItem(selectedId, 'feedbackGroups', [{ partyA: { content: v, date: time }, replies: [] }, ...(current.feedbackGroups || [])]); else if (current.feedbackGroups?.length) { const groups = [...current.feedbackGroups]; groups[0].replies.push({ content: v, date: time }); updateSubItem(selectedId, 'feedbackGroups', groups); } } }} strategyOptions={STRATEGY_OPTIONS} />
                     )
                 )
             )}
 
             <Modal
-                title={(isEditingProjectInfo && userRole === 'team') ? "维护项目基本信息" : "项目基本情况"}
+                title={(isEditingProjectInfo && user?.username === 'admin') ? "维护项目基本信息" : "项目基本情况"}
                 open={isProjectInfoModalOpen}
-                onCancel={() => { setIsProjectInfoModalOpen(false); setIsEditingProjectInfo(false); }}
+                onCancel={() => { setIsProjectInfoModalOpen(false); setIsEditingProjectInfo(false); setInfoActiveMenu('core'); }}
                 width={900}
                 destroyOnClose
-                footer={(isEditingProjectInfo && userRole === 'team') ? [
-                    <Button key="back" onClick={() => setIsEditingProjectInfo(false)}>返回展示</Button>,
+                footer={(isEditingProjectInfo && user?.username === 'admin') ? [
+                    <Button key="back" onClick={() => { setIsEditingProjectInfo(false); setInfoActiveMenu('core'); }}>返回展示</Button>,
                     <Button key="submit" type="primary" onClick={() => infoForm.submit()}>保存修改</Button>
-                ] : [<Button key="close" onClick={() => setIsProjectInfoModalOpen(false)}>关闭</Button>]}
+                ] : [<Button key="close" onClick={() => { setIsProjectInfoModalOpen(false); setInfoActiveMenu('core'); }}>关闭</Button>]}
             >
-                {(!isEditingProjectInfo || userRole !== 'team') ? (
+                {(!isEditingProjectInfo || user?.username !== 'admin') ? (
                     <div className="fade-in py-2">
                         <div className="flex justify-between items-start mb-6">
                             <div className="flex-1 pr-10">
                                 <h2 className="text-2xl font-extrabold text-slate-800 m-0">{projectInfo.name || '未命名项目'}</h2>
                                 <div className="mt-3 text-slate-500 text-sm leading-relaxed whitespace-pre-wrap">{projectInfo.intro || '暂无项目简介说明。'}</div>
                             </div>
-                            {userRole === 'team' && (
+                            {user?.username === 'admin' && (
                                 <Button icon={<SettingOutlined />} type="primary" ghost onClick={() => {
                                     setIsEditingProjectInfo(true);
+                                    setInfoActiveMenu('core');
                                     infoForm.setFieldsValue({
                                         ...projectInfo,
                                         contractDate: projectInfo.contractDate ? dayjs(projectInfo.contractDate) : null,
@@ -954,57 +1051,150 @@ const App = () => {
                         </Descriptions>
                     </div>
                 ) : (
-                    <Form form={infoForm} layout="vertical" onFinish={handleSaveProjectInfo} onValuesChange={onInfoValuesChange} className="fade-in">
-                        <Row gutter={24}>
-                            <Col span={24}><Tag className="section-tag mb-4">核心信息维护</Tag></Col>
-                            <Col span={12}><Form.Item name="name" label="项目名称"><Input placeholder="请输入项目全称" /></Form.Item></Col>
-                            <Col span={12}><Form.Item name="clientUnit" label="项目单位 (甲方)"><Input /></Form.Item></Col>
-                            <Col span={12}><Form.Item name="contractorUnit" label="承担单位 (乙方)"><Input /></Form.Item></Col>
-                            <Col span={12}><Form.Item name="supervisionUnit" label="监理单位"><Input /></Form.Item></Col>
-                            <Col span={24}><Form.Item name="intro" label="项目简介"><Input.TextArea rows={3} placeholder="描述建设目标及背景" /></Form.Item></Col>
-                            <Col span={12}><Form.Item name="contractDate" label="合同签订日期"><DatePicker className="w-full" /></Form.Item></Col>
-                            <Col span={12}><Form.Item name="startDate" label="项目开工日期" dependencies={['contractDate']} rules={[{ validator: async (_, value) => { const contract = infoForm.getFieldValue('contractDate'); if (value && contract && value.isBefore(contract, 'day')) { return Promise.reject(new Error('开工日期不应早于合同签订日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
-                            <Col span={24}><Divider orientation={"left" as any} className="m-0 text-slate-400 text-xs">里程碑节点维护</Divider></Col>
-                            <Col span={12}><Form.Item name="prePlanned" label="项目初验 (计划日期)" dependencies={['startDate']} rules={[{ validator: async (_, value) => { const start = infoForm.getFieldValue('startDate'); if (value && start && value.isBefore(start, 'day')) { return Promise.reject(new Error('初验日期不应早于开工日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
-                            <Col span={12}><Form.Item name="preActual" label="项目初验 (实际日期)" dependencies={['startDate']} rules={[{ validator: async (_, value) => { const start = infoForm.getFieldValue('startDate'); if (value && start && value.isBefore(start, 'day')) { return Promise.reject(new Error('初验日期不应早于开工日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
-                            <Col span={24}><Divider orientation={"left" as any} className="m-0 text-slate-400 text-xs">试运行详情</Divider></Col>
-                            <Col span={24}><Form.Item name="trialPeriod" label="试运行周期 (月)" initialValue={3}><InputNumber min={1} max={60} precision={0} style={{ width: '120px' }} /></Form.Item></Col>
-                            <Col span={8}><Form.Item name="trialStart" label="试运行开始日期" dependencies={['preActual', 'prePlanned']} rules={[{ validator: async (_, value) => { const pre = infoForm.getFieldValue('preActual') || infoForm.getFieldValue('prePlanned'); if (value && pre && value.isBefore(pre, 'day')) { return Promise.reject(new Error('试运行开始日期不能早于初验日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
-                            <Col span={8}><Form.Item name="trialEnd" label="试运行结束日期 (自动计算)"><DatePicker className="w-full" disabled /></Form.Item></Col>
-                            <Col span={8} className="flex items-center text-slate-400 text-[10px] italic pt-6">* 自动推算</Col>
-                            <Col span={24}><Divider orientation={"left" as any} className="m-0 text-slate-400 text-xs">终验维护</Divider></Col>
-                            <Col span={12}><Form.Item name="finalPlanned" label="项目终验 (计划日期)" dependencies={['trialEnd']} rules={[{ validator: async (_: any, value: any) => { const end = infoForm.getFieldValue('trialEnd'); if (value && end && value.isBefore(end, 'day')) { return Promise.reject(new Error('终验日期不能早于试运行结束日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
-                            <Col span={12}><Form.Item name="finalActual" label="项目终验 (实际日期)" dependencies={['trialEnd']} rules={[{ validator: async (_: any, value: any) => { const end = infoForm.getFieldValue('trialEnd'); if (value && end && value.isBefore(end, 'day')) { return Promise.reject(new Error('终验日期不能早于试运行结束日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
+                    <div className="flex gap-6 h-[500px]">
+                        <div className="w-48 shrink-0 border-r border-slate-100 flex flex-col gap-2 pr-4 pt-2">
+                            <div onClick={() => setInfoActiveMenu('core')} className={`cursor-pointer px-4 py-3 rounded-xl transition ${infoActiveMenu === 'core' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-50 text-slate-600'}`}>核心信息维护</div>
+                            <div onClick={() => setInfoActiveMenu('milestone')} className={`cursor-pointer px-4 py-3 rounded-xl transition ${infoActiveMenu === 'milestone' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-50 text-slate-600'}`}>里程碑与节点</div>
+                            <div onClick={() => setInfoActiveMenu('strategy')} className={`cursor-pointer px-4 py-3 rounded-xl transition ${infoActiveMenu === 'strategy' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-50 text-slate-600'}`}>响应策略字典</div>
+                            <div onClick={() => setInfoActiveMenu('users')} className={`cursor-pointer px-4 py-3 rounded-xl transition tracking-tight ${infoActiveMenu === 'users' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-50 text-slate-600'}`}>人员账号管理</div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto pr-2 pb-4 pt-1 custom-scroll">
+                            <Form form={infoForm} layout="vertical" onFinish={handleSaveProjectInfo} onValuesChange={onInfoValuesChange} className={`fade-in ${infoActiveMenu === 'users' ? 'hidden' : 'block'}`}>
+                                <div className={infoActiveMenu === 'core' ? 'block' : 'hidden'}>
+                                    <Row gutter={24}>
+                                        <Col span={24}><Tag className="section-tag mb-4">核心信息维护</Tag></Col>
+                                        <Col span={12}><Form.Item name="name" label="项目名称"><Input placeholder="请输入项目全称" /></Form.Item></Col>
+                                        <Col span={12}><Form.Item name="clientUnit" label="项目单位 (甲方)"><Input /></Form.Item></Col>
+                                        <Col span={12}><Form.Item name="contractorUnit" label="承担单位 (乙方)"><Input /></Form.Item></Col>
+                                        <Col span={12}><Form.Item name="supervisionUnit" label="监理单位"><Input /></Form.Item></Col>
+                                        <Col span={24}><Form.Item name="intro" label="项目简介"><Input.TextArea rows={3} placeholder="描述建设目标及背景" /></Form.Item></Col>
+                                        <Col span={12}><Form.Item name="contractDate" label="合同签订日期"><DatePicker className="w-full" /></Form.Item></Col>
+                                        <Col span={12}><Form.Item name="startDate" label="项目开工日期" dependencies={['contractDate']} rules={[{ validator: async (_, value) => { const contract = infoForm.getFieldValue('contractDate'); if (value && contract && value.isBefore(contract, 'day')) { return Promise.reject(new Error('开工日期不应早于合同签订日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
+                                    </Row>
+                                </div>
 
-                            <Col span={24}><Divider orientation={"left" as any} className="m-0 text-slate-400 text-xs">响应策略字典管理</Divider></Col>
-                            <Col span={24} className="mt-4">
-                                <Form.List name="strategies">
-                                    {(fields, { add, remove }) => (
-                                        <>
-                                            {fields.map(({ key, name, ...restField }) => (
-                                                <Row key={key} gutter={12} align="middle" className="mb-2">
-                                                    <Col span={8}>
-                                                        <Form.Item {...restField} name={[name, 'label']} rules={[{ required: true, message: '请输入名称' }]}><Input placeholder="策略名称" /></Form.Item>
-                                                    </Col>
-                                                    <Col span={8}>
-                                                        <Form.Item {...restField} name={[name, 'value']} rules={[{ required: true, message: '请输入Key' }]}><Input placeholder="唯一Key" /></Form.Item>
-                                                    </Col>
-                                                    <Col span={6}>
-                                                        <Form.Item {...restField} name={[name, 'color']} initialValue="blue"><Select options={[{ label: '蓝色', value: 'blue' }, { label: '紫色', value: 'purple' }, { label: '橙色', value: 'orange' }, { label: '绿色', value: 'green' }, { label: '红色', value: 'red' }, { label: '红色(深)', value: 'volcano' }, { label: '青色', value: 'cyan' }]} /></Form.Item>
-                                                    </Col>
-                                                    <Col span={2}>
-                                                        <Button type="text" danger icon={<DeleteOutlined />} onClick={() => remove(name)} />
-                                                    </Col>
-                                                </Row>
-                                            ))}
-                                            <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />} className="mb-4">添加新的响应方式</Button>
-                                        </>
-                                    )}
-                                </Form.List>
-                            </Col>
-                        </Row>
-                    </Form>
+                                <div className={infoActiveMenu === 'milestone' ? 'block' : 'hidden'}>
+                                    <Row gutter={24}>
+                                        <Col span={24}><Divider orientation={"left" as any} className="m-0 text-slate-400 text-xs">里程碑节点维护</Divider></Col>
+                                        <Col span={12} className="mt-4"><Form.Item name="prePlanned" label="项目初验 (计划日期)" dependencies={['startDate']} rules={[{ validator: async (_, value) => { const start = infoForm.getFieldValue('startDate'); if (value && start && value.isBefore(start, 'day')) { return Promise.reject(new Error('初验日期不应早于开工日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
+                                        <Col span={12} className="mt-4"><Form.Item name="preActual" label="项目初验 (实际日期)" dependencies={['startDate']} rules={[{ validator: async (_, value) => { const start = infoForm.getFieldValue('startDate'); if (value && start && value.isBefore(start, 'day')) { return Promise.reject(new Error('初验日期不应早于开工日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
+                                        <Col span={24}><Divider orientation={"left" as any} className="m-0 text-slate-400 text-xs mt-4">试运行详情</Divider></Col>
+                                        <Col span={24} className="mt-4"><Form.Item name="trialPeriod" label="试运行周期 (月)" initialValue={3}><InputNumber min={1} max={60} precision={0} style={{ width: '120px' }} /></Form.Item></Col>
+                                        <Col span={8}><Form.Item name="trialStart" label="试运行开始日期" dependencies={['preActual', 'prePlanned']} rules={[{ validator: async (_, value) => { const pre = infoForm.getFieldValue('preActual') || infoForm.getFieldValue('prePlanned'); if (value && pre && value.isBefore(pre, 'day')) { return Promise.reject(new Error('试运行开始日期不能早于初验日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
+                                        <Col span={8}><Form.Item name="trialEnd" label="试运行结束日期 (自动计算)"><DatePicker className="w-full" disabled /></Form.Item></Col>
+                                        <Col span={8} className="flex items-center text-slate-400 text-[10px] italic pt-6">* 自动推算</Col>
+                                        <Col span={24}><Divider orientation={"left" as any} className="m-0 text-slate-400 text-xs mt-4">终验维护</Divider></Col>
+                                        <Col span={12} className="mt-4"><Form.Item name="finalPlanned" label="项目终验 (计划日期)" dependencies={['trialEnd']} rules={[{ validator: async (_: any, value: any) => { const end = infoForm.getFieldValue('trialEnd'); if (value && end && value.isBefore(end, 'day')) { return Promise.reject(new Error('终验日期不能早于试运行结束日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
+                                        <Col span={12} className="mt-4"><Form.Item name="finalActual" label="项目终验 (实际日期)" dependencies={['trialEnd']} rules={[{ validator: async (_: any, value: any) => { const end = infoForm.getFieldValue('trialEnd'); if (value && end && value.isBefore(end, 'day')) { return Promise.reject(new Error('终验日期不能早于试运行结束日期')); } } }]}><DatePicker className="w-full" /></Form.Item></Col>
+                                    </Row>
+                                </div>
+
+                                <div className={infoActiveMenu === 'strategy' ? 'block' : 'hidden'}>
+                                    <Row gutter={24}>
+                                        <Col span={24}><Divider orientation={"left" as any} className="m-0 text-slate-400 text-xs">响应策略字典管理</Divider></Col>
+                                        <Col span={24} className="mt-4">
+                                            <Form.List name="strategies">
+                                                {(fields, { add, remove }) => (
+                                                    <>
+                                                        {fields.map(({ key, name, ...restField }) => (
+                                                            <Row key={key} gutter={12} align="middle" className="mb-2">
+                                                                <Col span={8}>
+                                                                    <Form.Item {...restField} name={[name, 'label']} rules={[{ required: true, message: '请输入名称' }]}><Input placeholder="策略名称" /></Form.Item>
+                                                                </Col>
+                                                                <Col span={8}>
+                                                                    <Form.Item {...restField} name={[name, 'value']} rules={[{ required: true, message: '请输入Key' }]}><Input placeholder="唯一Key" /></Form.Item>
+                                                                </Col>
+                                                                <Col span={6}>
+                                                                    <Form.Item {...restField} name={[name, 'color']} initialValue="blue"><Select options={[{ label: '蓝色', value: 'blue' }, { label: '紫色', value: 'purple' }, { label: '橙色', value: 'orange' }, { label: '绿色', value: 'green' }, { label: '红色', value: 'red' }, { label: '红色(深)', value: 'volcano' }, { label: '青色', value: 'cyan' }]} /></Form.Item>
+                                                                </Col>
+                                                                <Col span={2}>
+                                                                    <Button type="text" danger icon={<DeleteOutlined />} onClick={() => remove(name)} />
+                                                                </Col>
+                                                            </Row>
+                                                        ))}
+                                                        <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />} className="mb-4">添加新的响应方式</Button>
+                                                    </>
+                                                )}
+                                            </Form.List>
+                                        </Col>
+                                    </Row>
+                                </div>
+                            </Form>
+
+                            {infoActiveMenu === 'users' && (
+                                <div className="fade-in">
+                                    <Divider orientation={"left" as any} className="m-0 mb-6 text-slate-500 font-bold">人员账号与赋权管理</Divider>
+                                    <div className="mb-6 flex justify-between items-center bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-blue-500 p-2 rounded-lg"><TeamOutlined className="text-white" /></div>
+                                            <div>
+                                                <div className="text-sm font-bold text-slate-800">当前活跃账户</div>
+                                                <div className="text-[10px] text-blue-600 font-medium tracking-tight uppercase">Security & Permission Matrix</div>
+                                            </div>
+                                        </div>
+                                        <Badge status="processing" text="身份认证系统已锁定" className="text-[10px] bg-white px-3 py-1 rounded-full border border-blue-200" />
+                                    </div>
+                                    <Table
+                                        size="middle"
+                                        dataSource={userList}
+                                        rowKey="id"
+                                        columns={[
+                                            { title: '登录账号', dataIndex: 'username', key: 'username', className: 'text-slate-600 font-medium' },
+                                            { title: '真实姓名', dataIndex: 'realName', key: 'realName', className: 'font-bold' },
+                                            { title: '系统权限', dataIndex: 'role', key: 'role', render: (v) => v === 'team' ? <Tag color="blue" className="rounded-full px-3">项目组专家</Tag> : (v === 'supervisor' ? <Tag color="purple" className="rounded-full px-3">监理</Tag> : <Tag color="green" className="rounded-full px-3">甲方负责人</Tag>) },
+                                            {
+                                                title: '操作', key: 'op', align: 'center',
+                                                render: (_, record) => (
+                                                    <Space size="small">
+                                                        <Button type="text" icon={<KeyOutlined />} size="small" onClick={() => handleOpenPwdModal(record)} className="text-blue-500" title="修改/重置密码" />
+                                                        {record.username !== 'admin' && (
+                                                            <Popconfirm title="确认删除此账号？" onConfirm={() => handleDeleteUser(record.id)}>
+                                                                <Button type="text" danger icon={<DeleteOutlined />} size="small" title="删除账号" />
+                                                            </Popconfirm>
+                                                        )}
+                                                    </Space>
+                                                )
+                                            }
+                                        ]}
+                                        pagination={false}
+                                        className="mb-8 modern-table border border-slate-100 rounded-xl overflow-hidden shadow-sm"
+                                    />
+                                    <div className="bg-slate-50/80 p-6 rounded-2xl border border-dashed border-slate-200">
+                                        <div className="text-xs font-bold mb-4 text-slate-500 flex items-center gap-2"><PlusOutlined /> 快速录入新账户</div>
+                                        <Form layout="inline" onFinish={handleAddUser} className="gap-3">
+                                            <Form.Item name="username" rules={[{ required: true }]}><Input placeholder="账号" style={{ width: 140 }} className="rounded-lg" /></Form.Item>
+                                            <Form.Item name="password" rules={[{ required: true }]} initialValue="123456"><Input.Password placeholder="密码" style={{ width: 140 }} className="rounded-lg" /></Form.Item>
+                                            <Form.Item name="realName" rules={[{ required: true }]}><Input placeholder="姓名" style={{ width: 120 }} className="rounded-lg" /></Form.Item>
+                                            <Form.Item name="role" rules={[{ required: true }]} initialValue="partyA"><Select options={[{ label: '专家', value: 'team' }, { label: '甲方', value: 'partyA' }, { label: '监理', value: 'supervisor' }]} style={{ width: 110 }} className="rounded-lg" /></Form.Item>
+                                            <Form.Item className="mr-0"><Button type="primary" icon={<CheckCircleOutlined />} htmlType="submit" className="rounded-lg bg-blue-600 shadow-md">创建</Button></Form.Item>
+                                        </Form>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 )}
+            </Modal>
+
+            <Modal
+                title={pwdTargetUser?.id === user?.id ? "修改我的密码" : `重置 ${pwdTargetUser?.realName || pwdTargetUser?.username} 的密码`}
+                open={isPwdModalOpen}
+                onCancel={() => setIsPwdModalOpen(false)}
+                footer={null}
+                width={400}
+                destroyOnClose
+            >
+                <Form form={pwdForm} layout="vertical" onFinish={handleChangePassword} className="mt-4">
+                    <Form.Item name="newPassword" label="新密码" rules={[{ required: true, message: '请输入新密码' }, { min: 6, message: '密码不能少于6位' }]}>
+                        <Input.Password placeholder="请输入新的登录密码" />
+                    </Form.Item>
+                    <Form.Item className="mb-0 text-right">
+                        <Space>
+                            <Button onClick={() => setIsPwdModalOpen(false)}>取消</Button>
+                            <Button type="primary" htmlType="submit">保存修改</Button>
+                        </Space>
+                    </Form.Item>
+                </Form>
             </Modal>
 
             <Modal
@@ -1190,6 +1380,7 @@ const App = () => {
                 </div>
             </Modal>
             <Modal title={selectedId ? "编辑" : "新增"} open={isEditModalOpen} onOk={() => form.submit()} onCancel={() => setIsEditModalOpen(false)} width={650} destroyOnClose okText="确认保存" cancelText="取消"><Form form={form} layout="vertical" onFinish={saveModule}><Row gutter={16}><Col span={12}><Form.Item name="subsystem" label="所属子系统" rules={[{ required: true }]}><Select mode="tags" options={[...new Set(modules.map(m => m.subsystem))].map(s => ({ label: s, value: s }))} /></Form.Item></Col><Col span={12}><Form.Item name="name" label="模块名称" rules={[{ required: true }]}><Input /></Form.Item></Col></Row><Form.Item name="strategyType" label="响应策略" rules={[{ required: true }]}><Select options={STRATEGY_OPTIONS} /></Form.Item>{strategyTypeWatcher === 'customization' && <Form.Item name="modifiedModules" label="涉及改造模块"><Input /></Form.Item>}<Form.Item name="link" label="访问链接"><Input /></Form.Item><Row gutter={16}><Col span={12}><Form.Item name="progress" label="进度" initialValue={0}><InputNumber min={0} max={100} className="w-full" /></Form.Item></Col><Col span={12}><Form.Item name="deadline" label="截止日期" rules={[{ required: true }]}><DatePicker className="w-full" /></Form.Item></Col></Row><Form.Item name="tender" label="标书原文"><Input.TextArea rows={2} /></Form.Item><Form.Item name="strategy" label="具体实施策略"><Input.TextArea rows={2} /></Form.Item></Form></Modal>
+            <SystemGuide open={isGuideModalOpen} onClose={() => setIsGuideModalOpen(false)} />
         </ConfigProvider >
     );
 };

@@ -9,12 +9,11 @@ import {
     Maximize2, Minimize2, PieChart, TrendingUp, Share2, FileType, AlertCircle, Search
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import { MenuUnfoldOutlined, MenuFoldOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
 
-// 设置 PDF.js Worker 为项目本地路径，避免依赖外部 CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+// 设置 PDF.js Worker 为项目本地路径或者 CDN 路径，避免本地 worker 被 Vite 错误拦截导致假死
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 // --- 样式配置：解决 Tailwind 动态类名无法识别的问题 ---
 const THEMES = {
@@ -141,7 +140,7 @@ const TreeNode = ({ node, depth = 0, defaultExpanded, expandAllKey, onToggleStat
                                 {(depth >= 3) && (
                                     <button onClick={() => onEdit(node)} className="p-1.5 bg-white border border-slate-200 rounded-lg hover:text-indigo-600 shadow-sm" title="编辑"><Edit3 size={14} /></button>
                                 )}
-                                {!isProjectNode && depth >= 3 && <button onClick={() => onDelete(node.id)} className="p-1.5 bg-white border border-slate-200 rounded-lg hover:text-rose-600 shadow-sm" title="删除"><Trash2 size={14} /></button>}
+                                {depth >= 3 && <button onClick={() => onDelete(node.id)} className="p-1.5 bg-white border border-slate-200 rounded-lg hover:text-rose-600 shadow-sm" title="删除"><Trash2 size={14} /></button>}
                             </div>
                         )}
                     </div>
@@ -406,6 +405,19 @@ const ModuleParser = ({ onBack, onSync, modules = [], userRole = 'team', strateg
         const updates: any[] = [];
         let matchedCount = 0;
 
+        // 递归处理功能架构，确保 strategyType 始终存在（解决响应类型意外跳变问题）
+        const sanitizeStructure = (nodes: any[]): any[] => {
+            return nodes.map(node => {
+                const type = node.strategyType || (node.status === 'existing' ? 'customization' : (node.method === 'demo' ? 'demo' : 'development'));
+                return {
+                    id: node.id,
+                    text: node.text,
+                    strategyType: type,
+                    children: node.children ? sanitizeStructure(node.children) : []
+                };
+            });
+        };
+
         subsystems.forEach(ssNode => {
             const ssName = ssNode.text;
             const ssOriginalModules = ssNode.children || [];
@@ -418,14 +430,15 @@ const ModuleParser = ({ onBack, onSync, modules = [], userRole = 'team', strateg
                 const target = modules.find(m => {
                     const bssClean = internalClean(m.subsystem);
                     const bmClean = internalClean(m.name);
-                    return (bssClean === ssClean && bmClean === mClean) ||
-                        (bmClean === mClean && (bssClean.includes(ssClean) || ssClean.includes(bssClean)));
+                    // 精确匹配：子系统名包含或被包含，且模块名一致
+                    return (bmClean === mClean) && (bssClean.includes(ssClean) || ssClean.includes(bssClean));
                 });
 
                 if (target) {
                     updates.push({
                         id: target.id,
-                        functionalStructure: mNode.children || []
+                        // 深度同步：确保所有子节点（L3, L4...）都包含在内，且清理了多余状态
+                        functionalStructure: sanitizeStructure(mNode.children || [])
                     });
                     matchedCount++;
                 }
@@ -437,7 +450,8 @@ const ModuleParser = ({ onBack, onSync, modules = [], userRole = 'team', strateg
             return;
         }
 
-        const hide = message.loading(`正在同步 L3 及以下功能结构 (共 ${matchedCount} 个模块)...`, 0);
+        const syncMessageKey = 'sync-module-progress';
+        message.loading({ content: `正在同步 L3 及以下功能结构 (共 ${matchedCount} 个模块)...`, key: syncMessageKey, duration: 0 });
 
         try {
             // 仅 PATCH 更新 functionalStructure，不改变 name、subsystem 及 displayOrder (排序)
@@ -451,13 +465,11 @@ const ModuleParser = ({ onBack, onSync, modules = [], userRole = 'team', strateg
                 })
             ));
 
-            hide();
-            message.success(`同步成功！已成功更新 ${matchedCount} 个一级模块的内部功能架构，且未改动页面排序。`);
+            message.success({ content: `架构同步完成！已成功补齐 ${matchedCount} 个一级模块的最新内部功能。`, key: syncMessageKey, duration: 3 });
             if (onSync) onSync();
         } catch (e) {
-            hide();
             console.error('[Sync Error]', e);
-            message.error('同步失败，请检查网络连接');
+            message.error({ content: '同步失败，请检查网络连接', key: syncMessageKey, duration: 3 });
         }
     };
     const handleExportExcel = () => {
