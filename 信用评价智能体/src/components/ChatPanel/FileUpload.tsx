@@ -3,6 +3,7 @@ import { Paperclip } from 'lucide-react';
 import { useAgentStore } from '../../store';
 import { generateMockAiResponse } from '../../mock/ai-mock-hooks';
 import type { UploadedFile } from '../../types/model';
+import { BEIJING_HEATING_POLICY_FILE_LIBRARY } from '../../mock/beijing-heating-data';
 
 const FileUpload: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -13,14 +14,20 @@ const FileUpload: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const matchedPolicy = BEIJING_HEATING_POLICY_FILE_LIBRARY.find((item) => item.match.test(file.name));
+
     // Simulate file upload and parsing
     const mockUploadedFile: UploadedFile = {
       id: Math.random().toString(36).substring(2, 9),
       name: file.name,
       size: file.size,
       url: URL.createObjectURL(file), // mock url
-      summary: `这是对 ${file.name} 的 AI 智能摘要：该文件重点强调了在行业监管中应加大对安全生产、环保合规等指标的考察比重。建议在评分算法中采用阈值扣分制处理严重违规行为。`,
-      originalText: `【模拟提取文档原文：${file.name}】\n\n一、考核目标：建立健全相关单位的信用跟踪机制，从源头抓起。\n二、指标分类说明：\n1. 安全生产 (30%)：一年内有重大安全生产事故则直接降级。\n2. 环保合规 (40%)：排污许可证制度的落实执行情况。\n3. 日常规范 (30%)：按时上报监管材料报表的完成度。\n\n*本文档包含 12,040 字，此处摘录段落代表解析通过的人类可读原文。`
+      summary:
+        matchedPolicy?.summary ||
+        `这是对 ${file.name} 的 AI 智能摘要：文件重点强调供热行业监管中的安全生产、服务质量、公众投诉和失信惩戒机制，可用于构建年度信用评价模型。`,
+      originalText:
+        matchedPolicy?.originalText ||
+        `【模拟提取文档原文：${file.name}】\n\n一、考核目标：建立供热企业信用跟踪和分级监管机制。\n二、指标分类说明：\n1. 安全与合规：重大事故、失信执行人等触发否决。\n2. 供热质量：室温达标率、投诉率和稳定供热能力。\n3. 经营与绿色：能效、排放合规与管理执行。\n\n*本文档包含较长条文内容，此处为结构化节选。`,
     };
 
     addUploadedFile(mockUploadedFile);

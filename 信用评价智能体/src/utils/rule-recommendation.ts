@@ -272,6 +272,12 @@ const isConfigurableRuleType = (ruleType?: IndicatorNode['ruleType']): ruleType 
   RULE_TYPE_ORDER.includes(ruleType as ConfigurableRuleType);
 
 const recommendLeafNode = (node: IndicatorNode): IndicatorNode => {
+  if (node.ruleType === 'formula') {
+    return {
+      ...node,
+      direction: node.direction || 'positive',
+    };
+  }
   const matchedDataIndicator = node.dataSource
     ? findDataIndicatorByDataSource(node.dataSource)
     : inferDataIndicatorByText(node);

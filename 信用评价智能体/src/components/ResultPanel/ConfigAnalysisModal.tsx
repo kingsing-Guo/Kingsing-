@@ -15,26 +15,31 @@ interface StepStatus {
 const getIndicatorStats = (indicators: IndicatorNode[]) => {
   let totalNodes = 0;
   let leafNodes = 0;
-  let level1Count = 0;
-  let level2Count = 0;
-  let level3Count = 0;
+  let maxDepth = 0;
+  const levelCounter = new Map<number, number>();
 
-  const traverse = (nodes: IndicatorNode[]) => {
-    nodes.forEach(node => {
-      totalNodes++;
-      if (node.level === 1) level1Count++;
-      if (node.level === 2) level2Count++;
-      if (node.level === 3) level3Count++;
-
+  const traverse = (nodes: IndicatorNode[], depth: number) => {
+    maxDepth = Math.max(maxDepth, depth);
+    nodes.forEach((node) => {
+      totalNodes += 1;
+      levelCounter.set(depth, (levelCounter.get(depth) || 0) + 1);
       if (!node.children || node.children.length === 0) {
-        leafNodes++;
+        leafNodes += 1;
       } else {
-        traverse(node.children);
+        traverse(node.children, depth + 1);
       }
     });
   };
-  traverse(indicators);
-  return { totalNodes, leafNodes, level1Count, level2Count, level3Count };
+  traverse(indicators, 1);
+
+  return {
+    totalNodes,
+    leafNodes,
+    maxDepth,
+    levelCounts: Array.from(levelCounter.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([level, count]) => ({ level, count })),
+  };
 };
 
 export const ConfigAnalysisModal: React.FC = () => {
@@ -50,13 +55,15 @@ export const ConfigAnalysisModal: React.FC = () => {
 
   useEffect(() => {
     if (!isVisible) {
-      setCurrentCheckIndex(0);
-      setIsComplete(false);
-      setCountdown(3);
-      return;
+      const resetTimer = window.setTimeout(() => {
+        setCurrentCheckIndex(0);
+        setIsComplete(false);
+        setCountdown(3);
+      }, 0);
+      return () => clearTimeout(resetTimer);
     }
 
-    let timer: number;
+    let timer: number | undefined;
     if (currentCheckIndex < 4) {
       timer = window.setTimeout(() => {
         setCurrentCheckIndex((prev) => prev + 1);
@@ -67,26 +74,34 @@ export const ConfigAnalysisModal: React.FC = () => {
       }, 500);
     }
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+    };
   }, [isVisible, currentCheckIndex, isComplete]);
 
   useEffect(() => {
-    if (isComplete && isVisible) {
-      if (countdown > 0) {
-        const timer = window.setTimeout(() => setCountdown(countdown - 1), 1000);
-        return () => clearTimeout(timer);
-      } else {
-        setValidationStep('data_selection');
-      }
+    if (!isComplete || !isVisible) {
+      return;
     }
+    if (countdown > 0) {
+      const timer = window.setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+    setValidationStep('data_selection');
   }, [isComplete, countdown, isVisible, setValidationStep]);
 
   if (!modelSnapshot) return null;
 
-  const { totalNodes, leafNodes, level1Count, level2Count, level3Count } = getIndicatorStats(modelSnapshot.indicators);
+  const { totalNodes, leafNodes, maxDepth, levelCounts } = getIndicatorStats(modelSnapshot.indicators);
   const maxBonus = modelSnapshot.bonusRules.reduce((sum, rule) => sum + rule.score, 0);
   const minScore = modelSnapshot.gradeLevels.length > 0 ? Math.min(...modelSnapshot.gradeLevels.map(l => l.minScore)) : 0;
   const maxScore = modelSnapshot.totalScoreMode;
+  const gradeSummary = [...modelSnapshot.gradeLevels]
+    .sort((a, b) => b.minScore - a.minScore)
+    .map((item) => `${item.name}≥${item.minScore}`)
+    .join(' / ');
 
   const steps: StepStatus[] = [
     {
@@ -96,13 +111,22 @@ export const ConfigAnalysisModal: React.FC = () => {
       isPassed: currentCheckIndex > 0,
       renderContent: () => (
         <div className="flex flex-col gap-2 mt-2">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Tag icon={<BarChart2 size={12} className="mr-1 text-indigo-500" />} className="!bg-indigo-50/50 !border-indigo-100 !text-indigo-600 rounded">
+              模型：{modelSnapshot.modelName}
+            </Tag>
+            <Tag icon={<BarChart2 size={12} className="mr-1 text-cyan-500" />} className="!bg-cyan-50/50 !border-cyan-100 !text-cyan-600 rounded">
+              评分制：{modelSnapshot.totalScoreMode === 100 ? '百分制（100）' : '千分制（1000）'}
+            </Tag>
             <Tag icon={<BarChart2 size={12} className="mr-1 text-blue-500" />} className="!bg-blue-50/50 !border-blue-100 !text-blue-600 rounded">
               已配置 {modelSnapshot.gradeLevels.length} 个评分等级
             </Tag>
             <Tag icon={<BarChart2 size={12} className="mr-1 text-green-500" />} className="!bg-green-50/50 !border-green-100 !text-green-600 rounded">
               分数范围 {minScore} ~ {maxScore}+
             </Tag>
+          </div>
+          <div className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-md px-3 py-2">
+            当前等级阈值：{gradeSummary}
           </div>
           <div className="bg-gray-50/50 text-gray-500 text-xs px-3 py-2 rounded-md flex items-center gap-1.5 border border-gray-100 placeholder-opacity-70">
             <Sparkles size={14} className="text-yellow-400" /> 配置正常，未发现问题
@@ -119,11 +143,14 @@ export const ConfigAnalysisModal: React.FC = () => {
         <div className="flex flex-col gap-2 mt-2">
           <div className="flex flex-wrap gap-2">
             <Tag icon={<BarChart2 size={12} className="mr-1 text-indigo-500" />} className="!bg-indigo-50/50 !border-indigo-100 !text-indigo-600 rounded">
-              L1: {level1Count} 个 | L2: {level2Count} 个 | L3: {level3Count} 个
+              层级深度：{maxDepth} 级
             </Tag>
             <Tag icon={<BarChart2 size={12} className="mr-1 text-gray-500" />} className="!bg-gray-50/50 !border-gray-100 !text-gray-600 rounded">
               共 {totalNodes} 个节点 (含 {leafNodes} 个末级)
             </Tag>
+          </div>
+          <div className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-md px-3 py-2">
+            {levelCounts.map((item) => `${item.level}级指标 ${item.count} 个`).join(' ｜ ')}
           </div>
           <div className="bg-gray-50/50 text-gray-500 text-xs px-3 py-2 rounded-md flex items-center gap-1.5 border border-gray-100">
             <Sparkles size={14} className="text-yellow-400" /> 配置正常，未发现问题

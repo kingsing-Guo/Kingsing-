@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAgentStore } from '../../../store';
 import { Upload, Button } from 'antd';
 import type { UploadFile } from 'antd';
-import { FileText, Upload as UploadIcon } from 'lucide-react';
+import { FileText, Upload as UploadIcon, Paperclip, X } from 'lucide-react';
 
 const { Dragger } = Upload;
 
@@ -50,10 +50,11 @@ export const TemplateSelectionTab: React.FC = () => {
               <UploadIcon className="text-indigo-500" size={18} />
               上传新管理办法模版
             </h3>
-            <div className="flex-1">
+            <div className="flex-1 flex flex-col gap-3">
               <Dragger 
                 className="h-full bg-white border-dashed border-gray-300 hover:border-indigo-400 transition-colors rounded-lg"
                 fileList={fileList}
+                showUploadList={false}
                 beforeUpload={() => false}
                 onChange={(info) => {
                   setFileList(info.fileList);
@@ -70,6 +71,36 @@ export const TemplateSelectionTab: React.FC = () => {
                   支持 .docx / .pdf / .txt 格式，作为文案风格和章节模板参考
                 </p>
               </Dragger>
+              <div className="min-h-[72px] rounded-lg border border-gray-200 bg-white px-3 py-2">
+                {fileList.length > 0 ? (
+                  <div className="flex flex-col gap-2 max-h-28 overflow-y-auto pr-1">
+                    {fileList.map((file) => (
+                      <div
+                        key={file.uid}
+                        className="flex items-center gap-2 rounded-md border border-gray-100 bg-gray-50 px-2.5 py-1.5"
+                      >
+                        <Paperclip size={14} className="text-gray-400 shrink-0" />
+                        <span className="text-sm text-gray-700 truncate flex-1">{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFileList((prev) => prev.filter((item) => item.uid !== file.uid));
+                          }}
+                          className="inline-flex items-center justify-center rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+                          title="移除文件"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-full min-h-[52px] flex items-center text-xs text-gray-400">
+                    暂未添加模板文件
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

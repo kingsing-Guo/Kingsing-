@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAgentStore } from '../../store';
-import { Button, Form, Input, DatePicker, Select, Popover, Drawer, Table, Tag } from 'antd';
+import { Button, Form, Input, DatePicker, Select, Popover, Drawer, Table, Tag, message } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { Send, FileText, CheckCircle, BarChart3, Database, FileSpreadsheet, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 import dayjs from 'dayjs';
+import type { IndicatorNode } from '../../types/model';
+import { toPreferenceTags } from '../../utils/preference-tags';
 
 export const PublishPanel: React.FC = () => {
   const requirement = useAgentStore((state) => state.requirement);
   const modelSnapshot = useAgentStore((state) => state.modelSnapshot);
   const validationSettings = useAgentStore((state) => state.validationSettings);
   const publishSettings = useAgentStore((state) => state.publishSettings);
+  const currentPhase = useAgentStore((state) => state.currentPhase);
+  const chatPublishSignal = useAgentStore((state) => state.chatPublishSignal);
+  const consumedChatPublishSignal = useAgentStore((state) => state.consumedChatPublishSignal);
+  const consumePublishConfirm = useAgentStore((state) => state.consumePublishConfirm);
   const updatePublishSettings = useAgentStore((state) => state.updatePublishSettings);
   const setPhase = useAgentStore((state) => state.setPhase);
 
@@ -25,21 +32,29 @@ export const PublishPanel: React.FC = () => {
     validityPeriod: publishSettings.validityPeriod,
   };
 
+  const preferenceTags = toPreferenceTags(requirement.preferenceSummary, requirement.preferences);
+  const visiblePreferenceTags = preferenceTags.slice(0, 5);
+  const hiddenPreferenceCount = Math.max(0, preferenceTags.length - visiblePreferenceTags.length);
+  const preferenceOverview =
+    requirement.preferenceSummary.length > 0
+      ? requirement.preferenceSummary.join('；')
+      : requirement.preferences || '未指定特定偏好';
+
   const leafIndicatorsCount = modelSnapshot?.indicators.reduce((acc, curr) => 
     acc + (curr.children ? curr.children.length : 1), 0) || 0;
 
-  const getTreeDepth = (nodes: any[]): number => {
+  const getTreeDepth = (nodes: IndicatorNode[]): number => {
     if (!nodes || nodes.length === 0) return 0;
     return 1 + Math.max(...nodes.map(n => getTreeDepth(n.children || [])));
   };
   const treeDepth = modelSnapshot ? getTreeDepth(modelSnapshot.indicators) : 0;
 
-  const readonlyColumns = [
+  const readonlyColumns: ColumnsType<IndicatorNode> = [
     {
       title: '指标项',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string, record: any) => {
+      render: (text: string, record: IndicatorNode) => {
         const paddingLeft = record.level ? (record.level - 1) * 24 : 0;
         const hasChildren = !!(record.children && record.children.length > 0);
         const isExpanded = expandedKeys.includes(record.id);
@@ -69,7 +84,7 @@ export const PublishPanel: React.FC = () => {
       dataIndex: 'ruleType',
       key: 'ruleType',
       width: 140,
-      render: (val: string, record: any) => {
+      render: (val: IndicatorNode['ruleType'], record: IndicatorNode) => {
          if (record.children && record.children.length > 0) return '-';
          let label = '未配置';
          if (val === 'interval') label = '区间评分';
@@ -82,8 +97,25 @@ export const PublishPanel: React.FC = () => {
     }
   ];
 
-  const handlePublish = async () => {
+  const handlePublish = useCallback(async () => {
     try {
+      const valuesBeforeValidate = form.getFieldsValue();
+      if (!valuesBeforeValidate.modelName) {
+        form.setFieldValue('modelName', modelSnapshot?.modelName || '企业公共信用综合评价模型');
+      }
+      if (!valuesBeforeValidate.version) {
+        form.setFieldValue('version', publishSettings.version || 'V1.0');
+      }
+      if (!valuesBeforeValidate.effectiveDate) {
+        form.setFieldValue(
+          'effectiveDate',
+          publishSettings.effectiveDate ? dayjs(publishSettings.effectiveDate) : dayjs().add(1, 'day'),
+        );
+      }
+      if (!valuesBeforeValidate.validityPeriod) {
+        form.setFieldValue('validityPeriod', publishSettings.validityPeriod || '1');
+      }
+
       const values = await form.validateFields();
       setIsPublishing(true);
       
@@ -97,10 +129,39 @@ export const PublishPanel: React.FC = () => {
         setIsPublishing(false);
         setIsPublished(true);
       }, 1500);
-    } catch (e) {
-      // Validation failed
+    } catch (error) {
+      const firstError = (error as { errorFields?: Array<{ errors?: string[] }> })?.errorFields?.[0]?.errors?.[0];
+      message.warning(firstError || '发布前请先完善发布设置。');
     }
-  };
+  }, [form, modelSnapshot, publishSettings, updatePublishSettings]);
+
+  useEffect(() => {
+    form.setFieldsValue({
+      modelName: modelSnapshot?.modelName || '企业公共信用综合评价模型',
+      version: publishSettings.version,
+      effectiveDate: publishSettings.effectiveDate ? dayjs(publishSettings.effectiveDate) : null,
+      validityPeriod: publishSettings.validityPeriod,
+    });
+  }, [form, modelSnapshot?.modelName, publishSettings]);
+
+  useEffect(() => {
+    const isNewChatConfirmSignal = chatPublishSignal > consumedChatPublishSignal;
+    if (currentPhase === 'PUBLISH' && isNewChatConfirmSignal && !isPublished && !isPublishing) {
+      consumePublishConfirm(chatPublishSignal);
+      window.setTimeout(() => {
+        void handlePublish();
+      }, 0);
+    }
+    return undefined;
+  }, [
+    chatPublishSignal,
+    consumedChatPublishSignal,
+    consumePublishConfirm,
+    currentPhase,
+    isPublished,
+    isPublishing,
+    handlePublish,
+  ]);
 
   if (isPublished) {
     return (
@@ -129,27 +190,52 @@ export const PublishPanel: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden rounded-xl border border-gray-100 shadow-sm relative">
-      <div className="bg-white border-b border-gray-200 shrink-0 flex justify-center py-5 px-6">
-        <div className="max-w-[1000px] w-full flex flex-col gap-4">
+      <div className="bg-white border-b border-gray-200 shrink-0 flex justify-center py-3 px-6">
+        <div className="max-w-[1000px] w-full flex flex-col gap-2">
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
             <FileSpreadsheet className="text-blue-500" size={20} />
             起源与需求设定
           </h2>
-          <div className="flex gap-12 text-[14px]">
-            <div className="flex items-center gap-3 flex-1">
+          <div className="grid grid-cols-12 gap-3 text-[14px] items-center">
+            <div className="col-span-12 lg:col-span-10 flex items-center gap-2 min-w-0">
               <span className="text-gray-500 shrink-0">偏好重点:</span>
-              <div className="font-medium text-gray-800 bg-gray-50 px-3 py-1.5 rounded line-clamp-1 flex-1">
-                {requirement.preferences || '未指定特定偏好'}
-              </div>
+              <Popover
+                title={<span className="text-sm font-semibold">偏好重点（完整）</span>}
+                content={<div className="max-w-[520px] text-sm text-gray-700 leading-relaxed">{preferenceOverview}</div>}
+                trigger="hover"
+                placement="bottomLeft"
+              >
+                <div className="bg-gray-50 px-2.5 py-1 rounded-md flex-1 min-w-0 flex items-center gap-1.5 overflow-hidden">
+                  {preferenceTags.length > 0 ? (
+                    <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
+                      {visiblePreferenceTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex h-6 items-center rounded-md border border-blue-100 bg-white px-2 text-xs font-medium text-blue-700"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {hiddenPreferenceCount > 0 && (
+                        <span className="inline-flex h-6 items-center rounded-md border border-blue-100 bg-white px-2 text-xs text-blue-600">
+                          +{hiddenPreferenceCount}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400 truncate">暂无偏好</span>
+                  )}
+                </div>
+              </Popover>
             </div>
-            <div className="flex items-center gap-3 flex-1">
-              <span className="text-gray-500 shrink-0">参考文件规范:</span>
+            <div className="col-span-12 lg:col-span-2 flex items-center lg:justify-end gap-2">
+              <span className="text-gray-500 shrink-0 whitespace-nowrap">参考文件:</span>
               <div>
                 {requirement.files.length > 0 ? (
                   <Popover 
                     title={<span className="text-sm font-semibold">已引用文件清单</span>}
                     content={
-                      <div className="flex flex-col gap-2 max-w-[300px]">
+                      <div className="flex flex-col gap-2 max-w-[280px]">
                         {requirement.files.map(f => (
                           <div key={f.id} className="text-sm text-gray-700 truncate hover:text-blue-600 transition-colors bg-gray-50 px-2 py-1 rounded border border-gray-100">
                             📄 {f.name}
@@ -160,13 +246,13 @@ export const PublishPanel: React.FC = () => {
                     trigger="hover"
                     placement="bottomLeft"
                   >
-                    <span className="text-blue-600 font-medium cursor-pointer hover:underline inline-flex items-center gap-1 bg-blue-50/50 px-2.5 py-1 rounded">
+                    <span className="h-7 text-blue-600 text-sm font-medium cursor-pointer inline-flex items-center gap-1 bg-blue-50/70 px-2.5 rounded-md border border-blue-100 hover:bg-blue-100/70 transition-colors">
                       {requirement.files.length} 份
-                      <ChevronDown size={14} className="text-blue-400" />
+                      <ChevronDown size={12} className="text-blue-400" />
                     </span>
                   </Popover>
                 ) : (
-                  <span className="text-gray-400 italic bg-gray-50 px-3 py-1.5 rounded">0 份</span>
+                  <span className="h-7 text-gray-400 text-sm bg-gray-50 px-2.5 rounded-md border border-gray-100 inline-flex items-center">0 份</span>
                 )}
               </div>
             </div>

@@ -18,19 +18,27 @@ export const ValidationComputingOverlay: React.FC = () => {
       }
       setProgress(currentProgress);
 
-      if (currentProgress > 10 && logs.length === 1) {
-        setLogs(prev => [...prev, '正在读取主体基础信用数据...']);
-      } else if (currentProgress > 30 && logs.length === 2) {
-        setLogs(prev => [...prev, '执行一票否决项规则预校验...']);
-      } else if (currentProgress > 50 && logs.length === 3) {
-        setLogs(prev => [...prev, '并发执行叶子指标区间规则扫描...']);
-      } else if (currentProgress > 70 && logs.length === 4) {
-        setLogs(prev => [...prev, '计算加分项，合成主干分数矩阵...']);
-      } else if (currentProgress > 90 && logs.length === 5) {
-        setLogs(prev => [...prev, '分数映射，生成最终信用评价等级...']);
-      } else if (currentProgress === 100 && logs.length === 6) {
-        setLogs(prev => [...prev, '✅ 验算完成，正在生成分析报告...']);
-      }
+      setLogs((prev) => {
+        if (currentProgress > 10 && prev.length === 1) {
+          return [...prev, '正在读取主体基础信用数据...'];
+        }
+        if (currentProgress > 30 && prev.length === 2) {
+          return [...prev, '执行一票否决项规则预校验...'];
+        }
+        if (currentProgress > 50 && prev.length === 3) {
+          return [...prev, '并发执行叶子指标区间规则扫描...'];
+        }
+        if (currentProgress > 70 && prev.length === 4) {
+          return [...prev, '计算加分项，合成主干分数矩阵...'];
+        }
+        if (currentProgress > 90 && prev.length === 5) {
+          return [...prev, '分数映射，生成最终信用评价等级...'];
+        }
+        if (currentProgress === 100 && prev.length === 6) {
+          return [...prev, '✅ 验算完成，正在生成分析报告...'];
+        }
+        return prev;
+      });
     }, 200);
 
     return () => clearInterval(interval);

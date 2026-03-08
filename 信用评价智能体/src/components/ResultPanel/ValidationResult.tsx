@@ -1,27 +1,30 @@
 import React, { useState } from 'react';
 import { useAgentStore } from '../../store';
 import { Button, Table, Drawer, Tag } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { Wrench, CheckCircle, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 import { ValidationResultKSTab } from './ValidationResultKSTab';
 import { ValidationResultDistTab } from './ValidationResultDistTab';
 import { ValidationResultListTab } from './ValidationResultListTab';
+import type { IndicatorNode } from '../../types/model';
 
 export const ValidationResult: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'ks' | 'dist' | 'list'>('ks');
   const [modelPreviewVisible, setModelPreviewVisible] = useState(false);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
 
   const validationSettings = useAgentStore((state) => state.validationSettings);
+  const activeTab = useAgentStore((state) => state.resultViewSettings.activeTab);
+  const setResultActiveTab = useAgentStore((state) => state.setResultActiveTab);
   const modelSnapshot = useAgentStore((state) => state.modelSnapshot);
   const setValidationStep = useAgentStore((state) => state.setValidationStep);
   const setPhase = useAgentStore((state) => state.setPhase);
 
-  const readonlyColumns = [
+  const readonlyColumns: ColumnsType<IndicatorNode> = [
     {
       title: '指标项',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string, record: any) => {
+      render: (text: string, record: IndicatorNode) => {
         const paddingLeft = record.level ? (record.level - 1) * 24 : 0;
         const hasChildren = !!(record.children && record.children.length > 0);
         const isExpanded = expandedKeys.includes(record.id);
@@ -51,7 +54,7 @@ export const ValidationResult: React.FC = () => {
       dataIndex: 'ruleType',
       key: 'ruleType',
       width: 140,
-      render: (val: string, record: any) => {
+      render: (val: IndicatorNode['ruleType'], record: IndicatorNode) => {
          if (record.children && record.children.length > 0) return '-';
          let label = '未配置';
          if (val === 'interval') label = '区间评分';
@@ -74,7 +77,7 @@ export const ValidationResult: React.FC = () => {
              <button
                key={tabKey}
                className={`pb-3 px-2 text-[15px] font-medium transition-colors relative ${activeTab === tabKey ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'}`}
-               onClick={() => setActiveTab(tabKey)}
+               onClick={() => setResultActiveTab(tabKey)}
              >
                {tabKey === 'ks' && 'K-S 区分度分析'}
                {tabKey === 'dist' && '分数分布特征'}

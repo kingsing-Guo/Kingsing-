@@ -3,8 +3,70 @@ import { Send } from 'lucide-react';
 import { Modal } from 'antd';
 import FileUpload from './FileUpload';
 import { useInputArea } from './hooks';
+import { useAgentStore } from '../../store';
+
+const getPhaseCommands = (phase: string, validationStep: string): string[] => {
+  if (phase === 'REQUIREMENT' || phase === 'BUILDING') {
+    return [
+      '开始构建指标体系',
+      '帮我搜一下其他省市的做法',
+      '按北京市供热企业场景构建模型',
+      '模型偏向安全合规和供热服务质量',
+      '把模型名字改为北京市供热企业信用评价模型',
+    ];
+  }
+  if (phase === 'ADJUSTING') {
+    return [
+      '改为千分制',
+      '增加加分项 获得国家级奖项 +8分',
+      '增加否决项 发生重大安全事故',
+      '把公共信用综合评价占比改为20%',
+      '把A等级分值改为85',
+      '开始验算',
+    ];
+  }
+  if (phase === 'VALIDATING' && validationStep !== 'result') {
+    return [
+      '验算样本量改为300',
+      '验算行业改为环境保护',
+      '切换验算数据源为本地上传导入',
+      '使用北京市95家供热企业样本',
+      '开始验算跑批',
+    ];
+  }
+  if (phase === 'RESULT' || (phase === 'VALIDATING' && validationStep === 'result')) {
+    return [
+      '切到企业列表',
+      '只看有否决项企业',
+      '只看有加分项企业',
+      '取消否决项筛选',
+      '取消加分项筛选',
+      '进入上线发布',
+    ];
+  }
+  if (phase === 'PUBLISH') {
+    return [
+      '版本号改为V1.2',
+      '生效日期改为2026-04-01',
+      '有效期改为2年',
+      '确认发布',
+      '帮我把模型转为Excel表格输出',
+    ];
+  }
+  if (phase === 'DOCUMENT') {
+    return [
+      '选择模板',
+      '开始生成管理办法',
+      '预览文档',
+      '导出Word文档',
+    ];
+  }
+  return ['开始构建指标体系'];
+};
 
 const InputArea: React.FC = () => {
+  const currentPhase = useAgentStore((state) => state.currentPhase);
+  const validationStep = useAgentStore((state) => state.validationStep);
   const {
     text,
     setText,
@@ -16,6 +78,7 @@ const InputArea: React.FC = () => {
     handleSend,
     handleKeyDown
   } = useInputArea();
+  const quickCommands = getPhaseCommands(currentPhase, validationStep);
 
   return (
     <div className="flex flex-col gap-2 relative bg-white pb-4 px-4">
@@ -36,17 +99,7 @@ const InputArea: React.FC = () => {
       </Modal>
 
       <div className="flex flex-wrap items-center gap-2 py-2">
-        {[
-          '开始构建指标体系',
-          '把模型名字改为交通运输信用评价模型',
-          '改为千分制',
-          '增加加分项 获得国家级奖项 +8分',
-          '增加否决项 发生重大安全事故',
-          '把公共信用综合评价占比改为20%',
-          '把A等级分值改为85',
-          '帮我把模型转为Excel表格输出',
-          '我要验算模型',
-        ].map((cmd) => (
+        {quickCommands.map((cmd) => (
           <button 
             key={cmd}
             className="text-xs bg-blue-50/80 border border-blue-100 text-blue-600 px-3 py-1.5 rounded-full hover:bg-blue-100 transition-colors"

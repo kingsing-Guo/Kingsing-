@@ -3,17 +3,21 @@ import { useAgentStore } from '../../../store';
 import { Button, message } from 'antd';
 import { Download, Save } from 'lucide-react';
 import dayjs from 'dayjs';
+import { BEIJING_HEATING_DOC_TITLE } from '../../../mock/beijing-heating-data';
 
 export const DocumentPreviewTab: React.FC = () => {
   const modelSnapshot = useAgentStore(state => state.modelSnapshot);
   const publishSettings = useAgentStore(state => state.publishSettings);
+  const defaultDocTitle = modelSnapshot?.modelName
+    ? `${modelSnapshot.modelName.replace(/模型$/, '').replace(/\s+/g, '')}管理办法`
+    : BEIJING_HEATING_DOC_TITLE;
   
   const defaultDocContent = `
-# ${modelSnapshot?.modelName || '公共信用综合评价模型'}管理办法 (草案)
+# ${defaultDocTitle} (草案)
 
 ## 第一章 总则
-**第一条** 为规范和推进本单位公共信用综合评价工作，依据相关政策法规与业务规范，特制定本办法。
-**第二条** 本办法适用于参与信核评估的所有管辖企业，模型使用期限为 ${publishSettings.validityPeriod} 年。
+**第一条** 为规范北京市供热企业信用评价管理，依据相关政策法规与行业监管要求，制定本办法。
+**第二条** 本办法适用于纳入监管范围的供热企业，评价周期按年度执行，模型结果有效期为 ${publishSettings.validityPeriod} 年。
 
 ## 第二章 评价指标体系结构
 **第三条** 本评价模型共设置 ${modelSnapshot?.indicators.length || 0} 个一级指标门类，采用 ${modelSnapshot?.totalScoreMode || 100} 分制进行评估。

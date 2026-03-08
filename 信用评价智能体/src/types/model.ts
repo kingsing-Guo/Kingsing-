@@ -1,3 +1,5 @@
+import type { ChatMessage } from './chat';
+
 export type AppPhase =
   | 'REQUIREMENT'
   | 'BUILDING'
@@ -28,7 +30,9 @@ export interface ReferenceCase {
 export interface ModelRequirement {
   files: UploadedFile[];
   referenceCases: ReferenceCase[];
-  preferences: string; // 偏好
+  preferences: string; // 偏好（兼容旧字段，用于发布页展示）
+  requirementSummary: string[]; // 需求归纳要点
+  preferenceSummary: string[]; // 偏好归纳要点
 }
 
 // ============================================
@@ -134,6 +138,7 @@ export interface CreditEvalModel {
 
 export type ValidationStep = 'idle' | 'checking' | 'data_selection' | 'computing' | 'result';
 export type DocumentStep = 'template_selection' | 'generating' | 'preview';
+export type ResultActiveTab = 'ks' | 'dist' | 'list';
 
 export interface ValidationSettings {
   mode: 'database' | 'import';
@@ -141,6 +146,9 @@ export interface ValidationSettings {
   selectedAttributeCombo: 'scale' | 'nature' | null;
   selectedAttributeValues: string[];
   sampleCount: number;
+  importedDatasetId: string | null;
+  importedFileName: string;
+  importedRecordCount: number;
 }
 
 export interface PublishSettings {
@@ -149,3 +157,34 @@ export interface PublishSettings {
   validityPeriod: '1' | '2' | '3'; // Years
 }
 
+export interface ResultListFilters {
+  grade: 'all' | string;
+  vetoOnly: boolean;
+  bonusOnly: boolean;
+}
+
+export interface ResultViewSettings {
+  activeTab: ResultActiveTab;
+  listFilters: ResultListFilters;
+}
+
+export interface ProjectSnapshot {
+  currentPhase: AppPhase;
+  chatHistory: ChatMessage[];
+  requirement: ModelRequirement;
+  modelSnapshot: CreditEvalModel | null;
+  validationStep: ValidationStep;
+  validationSettings: ValidationSettings;
+  resultViewSettings: ResultViewSettings;
+  publishSettings: PublishSettings;
+  documentStep: DocumentStep;
+  maxUnlockedPhase: AppPhase;
+}
+
+export interface AgentProject {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  snapshot: ProjectSnapshot;
+}

@@ -1,10 +1,33 @@
-import type { CreditEvalModel, IndicatorNode } from '../types/model';
+import type {
+  AppPhase,
+  CreditEvalModel,
+  DocumentStep,
+  IndicatorNode,
+  PublishSettings,
+  ResultActiveTab,
+  ResultListFilters,
+  ValidationSettings,
+  ValidationStep,
+} from '../types/model';
 import { exportModelAsCsv, exportModelAsExcel } from './model-export';
+import { BEIJING_HEATING_VALIDATION_DATASET } from '../mock/beijing-heating-data';
 
 interface ExecuteChatCommandParams {
   input: string;
   modelSnapshot: CreditEvalModel | null;
   setModelSnapshot: (model: CreditEvalModel) => void;
+  currentPhase: AppPhase;
+  setPhase: (phase: AppPhase) => void;
+  validationStep: ValidationStep;
+  setValidationStep: (step: ValidationStep) => void;
+  updateValidationSettings: (settings: Partial<ValidationSettings>) => void;
+  setResultActiveTab: (tab: ResultActiveTab) => void;
+  updateResultListFilters: (filters: Partial<ResultListFilters>) => void;
+  resetResultListFilters: () => void;
+  updatePublishSettings: (settings: Partial<PublishSettings>) => void;
+  setDocumentStep: (step: DocumentStep) => void;
+  requestPublishConfirm: () => void;
+  renameActiveProject: (name: string) => void;
 }
 
 interface ExecuteChatCommandResult {
@@ -13,6 +36,7 @@ interface ExecuteChatCommandResult {
 }
 
 const GRADE_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899'];
+const INDUSTRY_OPTIONS = ['交通运输', '环境保护', '公共事业', '养老服务', '家政服务', '医疗健康', '教育培训'] as const;
 
 const normalizeModelName = (rawName: string) =>
   rawName
@@ -223,6 +247,57 @@ const parsePublicCreditWeight = (input: string): number | null => {
   return null;
 };
 
+const parseSampleCount = (input: string): number | null => {
+  if (!/(样本量|样本数|抽样数|抽签总数|企业数)/.test(input)) {
+    return null;
+  }
+  const matched = input.match(/(\d{1,6})/);
+  if (!matched?.[1]) {
+    return null;
+  }
+  return Math.max(1, Math.min(100000, Number(matched[1])));
+};
+
+const parseIndustry = (input: string): string | null => {
+  if (/所有行业|全部行业|全行业/.test(input)) {
+    return 'all';
+  }
+  const matched = INDUSTRY_OPTIONS.find((item) => input.includes(item));
+  return matched || null;
+};
+
+const parseDateText = (input: string): number | null => {
+  const matched = input.match(/(\d{4})[年\-/.](\d{1,2})[月\-/.](\d{1,2})日?/);
+  if (!matched) {
+    return null;
+  }
+  const year = Number(matched[1]);
+  const month = Number(matched[2]);
+  const day = Number(matched[3]);
+  if (!year || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+  const date = new Date(year, month - 1, day, 0, 0, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date.getTime();
+};
+
+const parseValidityPeriod = (input: string): PublishSettings['validityPeriod'] | null => {
+  const digitMatch = input.match(/有效期[^0-9一二三两]*([123])\s*年?/);
+  if (digitMatch?.[1]) {
+    return digitMatch[1] as PublishSettings['validityPeriod'];
+  }
+  if (/有效期.*(一年|1年)/.test(input)) {
+    return '1';
+  }
+  if (/有效期.*(二年|两年|2年)/.test(input)) {
+    return '2';
+  }
+  if (/有效期.*(三年|3年)/.test(input)) {
+    return '3';
+  }
+  return null;
+};
+
 const detectExportIntent = (input: string) => {
   const normalized = input.toLowerCase();
   const hasExportVerb = /(导出|导成|输出|下载|转成|转为|转换)/.test(input);
@@ -311,6 +386,9 @@ const addBonusRuleByText = (input: string, model: CreditEvalModel) => {
 };
 
 const deleteBonusRuleByText = (input: string, model: CreditEvalModel) => {
+  if (/(筛选|过滤)/.test(input)) {
+    return { matchedAny: false, nextModel: model, replies: [] as string[] };
+  }
   let matchedAny = false;
   let nextModel = model;
   const replies: string[] = [];
@@ -452,6 +530,9 @@ const addVetoRuleByText = (input: string, model: CreditEvalModel) => {
 };
 
 const deleteVetoRuleByText = (input: string, model: CreditEvalModel) => {
+  if (/(筛选|过滤)/.test(input)) {
+    return { matchedAny: false, nextModel: model, replies: [] as string[] };
+  }
   let matchedAny = false;
   let nextModel = model;
   const replies: string[] = [];
@@ -680,10 +761,314 @@ const updateGradeScoreByText = (input: string, model: CreditEvalModel) => {
   return { matchedAny, nextModel, replies };
 };
 
+const handleWorkflowCommands = (
+  input: string,
+  params: Pick<
+    ExecuteChatCommandParams,
+    | 'currentPhase'
+    | 'setPhase'
+    | 'validationStep'
+    | 'setValidationStep'
+    | 'updateValidationSettings'
+    | 'setResultActiveTab'
+    | 'updateResultListFilters'
+    | 'resetResultListFilters'
+    | 'updatePublishSettings'
+    | 'setDocumentStep'
+    | 'requestPublishConfirm'
+  >,
+) => {
+  const replies: string[] = [];
+  let matchedAny = false;
+
+  const {
+    currentPhase,
+    setPhase,
+    validationStep,
+    setValidationStep,
+    updateValidationSettings,
+    setResultActiveTab,
+    updateResultListFilters,
+    resetResultListFilters,
+    updatePublishSettings,
+    setDocumentStep,
+    requestPublishConfirm,
+  } = params;
+
+  const normalized = input.replace(/\s+/g, '');
+
+  const wantsValidationPhase =
+    /(开始|进入|去|到|执行|发起|启动|重新|重跑|再跑).*(验算|试算|校验|跑批)/.test(input) ||
+    /(验算|试算|校验).*(开始|执行|发起|启动|重新|重跑)/.test(input);
+  if (wantsValidationPhase) {
+    matchedAny = true;
+    if (currentPhase !== 'VALIDATING') {
+      setPhase('VALIDATING');
+    }
+    if (validationStep === 'idle') {
+      setValidationStep('checking');
+      replies.push('已进入模型验算，并开始配置检查。');
+    } else {
+      replies.push('已切换到模型验算阶段。');
+    }
+  }
+
+  const wantsStartComputing = /(开始|执行|启动|运行|重跑|再跑).*(验算|试算|跑批)/.test(input);
+  if (wantsStartComputing && (currentPhase === 'VALIDATING' || currentPhase === 'RESULT')) {
+    matchedAny = true;
+    setPhase('VALIDATING');
+    if (validationStep === 'data_selection' || validationStep === 'result' || currentPhase === 'RESULT') {
+      setValidationStep('computing');
+      replies.push('已开始执行模型验算跑批。');
+    }
+  }
+
+  const sampleCount = parseSampleCount(input);
+  if (sampleCount !== null) {
+    matchedAny = true;
+    updateValidationSettings({ sampleCount });
+    replies.push(`已将验算样本量设置为 ${sampleCount} 家。`);
+  }
+
+  const industry = parseIndustry(input);
+  if (
+    industry &&
+    (/(行业)/.test(input) || /(样本|验算|数据源|抽样)/.test(input))
+  ) {
+    matchedAny = true;
+    updateValidationSettings({ industry });
+    replies.push(`已将验算行业设置为${industry === 'all' ? '所有行业' : `「${industry}」`}。`);
+  }
+
+  if (
+    /(数据源|验算数据|抽样模式|验算模式)/.test(input) ||
+    /(切换|改为|设为|设置为|使用).*(湖仓|数据库|抽样|本地|上传|导入|文件)/.test(input)
+  ) {
+    if (/(湖仓|数据库|抽样)/.test(input)) {
+      matchedAny = true;
+      updateValidationSettings({
+        mode: 'database',
+        importedDatasetId: null,
+        importedFileName: '',
+        importedRecordCount: 0,
+      });
+      replies.push('已切换验算数据源为湖仓随机抽样。');
+    } else if (/(本地|上传|导入|文件)/.test(input)) {
+      matchedAny = true;
+      updateValidationSettings({ mode: 'import' });
+      replies.push('已切换验算数据源为本地上传导入。');
+    }
+  }
+
+  if (
+    /(北京|北京市).*(供热|热力).*(名单|企业|样本|95)|北京市热力公司|使用北京市95家供热企业样本|95家供热企业样本/.test(
+      normalized,
+    )
+  ) {
+    matchedAny = true;
+    setPhase('VALIDATING');
+    if (validationStep === 'idle') {
+      setValidationStep('data_selection');
+    }
+    updateValidationSettings({
+      mode: 'import',
+      importedDatasetId: BEIJING_HEATING_VALIDATION_DATASET.id,
+      importedFileName: BEIJING_HEATING_VALIDATION_DATASET.fileName,
+      importedRecordCount: BEIJING_HEATING_VALIDATION_DATASET.enterprises.length,
+      sampleCount: BEIJING_HEATING_VALIDATION_DATASET.enterprises.length,
+    });
+    replies.push(
+      `已载入北京市供热企业名单样本，共 ${BEIJING_HEATING_VALIDATION_DATASET.enterprises.length} 家，并切换到验算准备页。`,
+    );
+  }
+
+  if (/(企业规模|规模标签)/.test(input) && /(按|用|设置|切换|改为|选择)/.test(input)) {
+    matchedAny = true;
+    updateValidationSettings({ selectedAttributeCombo: 'scale', selectedAttributeValues: [] });
+    replies.push('已将抽样分类属性切换为企业规模。');
+  } else if (/(企业性质|性质标签)/.test(input) && /(按|用|设置|切换|改为|选择)/.test(input)) {
+    matchedAny = true;
+    updateValidationSettings({ selectedAttributeCombo: 'nature', selectedAttributeValues: [] });
+    replies.push('已将抽样分类属性切换为企业性质。');
+  }
+
+  const wantsResultPhase =
+    /(结果分析|分析结果|查看结果|验算结果|结果页)/.test(input) &&
+    /(进入|去|打开|查看|切换|展示|看)/.test(input);
+  if (wantsResultPhase) {
+    matchedAny = true;
+    setPhase('RESULT');
+    setValidationStep('result');
+    replies.push('已切换到结果分析阶段。');
+  }
+
+  const wantsKsTab = /(ks|区分度)/i.test(input) && /(切|看|查看|到|去|展示|打开)/.test(input);
+  const wantsDistTab = /(分布|直方图|分数分布)/.test(input) && /(切|看|查看|到|去|展示|打开)/.test(input);
+  const wantsListTab = /(企业列表|企业名单|列表视图|名单视图)/.test(input) && /(切|看|查看|到|去|展示|打开)/.test(input);
+
+  if (wantsKsTab || wantsDistTab || wantsListTab) {
+    matchedAny = true;
+    setPhase('RESULT');
+    setValidationStep('result');
+    if (wantsKsTab) {
+      setResultActiveTab('ks');
+      replies.push('已切换到 K-S 区分度分析。');
+    } else if (wantsDistTab) {
+      setResultActiveTab('dist');
+      replies.push('已切换到分数分布特征。');
+    } else {
+      setResultActiveTab('list');
+      replies.push('已切换到企业列表视图。');
+    }
+  }
+
+  if (/(重置筛选|清空筛选|取消筛选|显示全部企业)/.test(input)) {
+    matchedAny = true;
+    resetResultListFilters();
+    replies.push('已重置企业列表筛选条件。');
+  } else {
+    const vetoOn = /(只看|仅看|筛选|过滤).*(否决项)/.test(input) && !/(取消|清除|关闭|去掉)/.test(input);
+    const vetoOff = /(取消|清除|关闭|去掉).*(否决项).*(筛选|过滤)?/.test(input);
+    if (vetoOn) {
+      matchedAny = true;
+      setPhase('RESULT');
+      setValidationStep('result');
+      setResultActiveTab('list');
+      updateResultListFilters({ vetoOnly: true });
+      replies.push('已筛选为仅显示有否决项的企业。');
+    } else if (vetoOff) {
+      matchedAny = true;
+      setPhase('RESULT');
+      setValidationStep('result');
+      setResultActiveTab('list');
+      updateResultListFilters({ vetoOnly: false });
+      replies.push('已取消否决项筛选。');
+    }
+
+    const bonusOn = /(只看|仅看|筛选|过滤).*(加分项)/.test(input) && !/(取消|清除|关闭|去掉)/.test(input);
+    const bonusOff = /(取消|清除|关闭|去掉).*(加分项).*(筛选|过滤)?/.test(input);
+    if (bonusOn) {
+      matchedAny = true;
+      setPhase('RESULT');
+      setValidationStep('result');
+      setResultActiveTab('list');
+      updateResultListFilters({ bonusOnly: true });
+      replies.push('已筛选为仅显示有加分项的企业。');
+    } else if (bonusOff) {
+      matchedAny = true;
+      setPhase('RESULT');
+      setValidationStep('result');
+      setResultActiveTab('list');
+      updateResultListFilters({ bonusOnly: false });
+      replies.push('已取消加分项筛选。');
+    }
+
+    const gradeMatch = input.match(/(?:只看|仅看|筛选|过滤).*(A|B|C|D|E|F)\s*级/i);
+    if (gradeMatch?.[1]) {
+      matchedAny = true;
+      const grade = gradeMatch[1].toUpperCase();
+      setPhase('RESULT');
+      setValidationStep('result');
+      setResultActiveTab('list');
+      updateResultListFilters({ grade });
+      replies.push(`已筛选为仅显示 ${grade} 级企业。`);
+    } else if (/(取消|清除|恢复).*(等级|评级).*(筛选|过滤)|显示全部等级/.test(input)) {
+      matchedAny = true;
+      setPhase('RESULT');
+      setValidationStep('result');
+      setResultActiveTab('list');
+      updateResultListFilters({ grade: 'all' });
+      replies.push('已取消等级筛选。');
+    }
+  }
+
+  if (/(上线发布|发布阶段|发布页面|进入发布)/.test(input)) {
+    matchedAny = true;
+    setPhase('PUBLISH');
+    replies.push('已切换到上线发布阶段。');
+  }
+
+  const versionMatch = input.match(/(?:版本(?:号)?)(?:改为|设为|设置为|更新为|为)?\s*([Vv]?\d+(?:\.\d+)*)/);
+  if (versionMatch?.[1]) {
+    matchedAny = true;
+    const version = versionMatch[1].startsWith('V') || versionMatch[1].startsWith('v')
+      ? `V${versionMatch[1].slice(1)}`
+      : `V${versionMatch[1]}`;
+    updatePublishSettings({ version });
+    replies.push(`已将发布版本设置为 ${version}。`);
+  }
+
+  const effectiveDate = parseDateText(input);
+  if (effectiveDate && /(生效日期|启用时间|生效时间|发布日期)/.test(input)) {
+    matchedAny = true;
+    updatePublishSettings({ effectiveDate });
+    const date = new Date(effectiveDate);
+    replies.push(`已将生效日期设置为 ${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}。`);
+  }
+
+  const validityPeriod = parseValidityPeriod(input);
+  if (validityPeriod) {
+    matchedAny = true;
+    updatePublishSettings({ validityPeriod });
+    replies.push(`已将有效期设置为 ${validityPeriod} 年。`);
+  }
+
+  if (/(确认发布|立即发布|执行发布|确认并发布|发布确认|确认上线|正式发布)/.test(input)) {
+    matchedAny = true;
+    setPhase('PUBLISH');
+    requestPublishConfirm();
+    replies.push('已触发确认发布流程。');
+  }
+
+  if (/(生成管理办法|管理办法|文档生成|文档阶段|进入文档)/.test(input)) {
+    matchedAny = true;
+    setPhase('DOCUMENT');
+    replies.push('已切换到管理办法生成阶段。');
+  }
+
+  if (/(模板选择|选择模板|返回模板)/.test(input)) {
+    matchedAny = true;
+    setPhase('DOCUMENT');
+    setDocumentStep('template_selection');
+    replies.push('已切换到模板选择。');
+  } else if (/(开始生成|启动撰写|生成文档|开始撰写)/.test(input)) {
+    matchedAny = true;
+    setPhase('DOCUMENT');
+    setDocumentStep('generating');
+    replies.push('已开始生成管理办法文档。');
+  } else if (/(预览文档|查看文档|打开预览|文档预览)/.test(input)) {
+    matchedAny = true;
+    setPhase('DOCUMENT');
+    setDocumentStep('preview');
+    replies.push('已打开文档预览。');
+  }
+
+  if (/(导出word|下载word|导出文档)/i.test(normalized)) {
+    matchedAny = true;
+    setPhase('DOCUMENT');
+    setDocumentStep('preview');
+    replies.push('已进入文档预览，可点击“导出 Word”下载。');
+  }
+
+  return { matchedAny, replies };
+};
+
 export const executeChatCommand = ({
   input,
   modelSnapshot,
   setModelSnapshot,
+  currentPhase,
+  setPhase,
+  validationStep,
+  setValidationStep,
+  updateValidationSettings,
+  setResultActiveTab,
+  updateResultListFilters,
+  resetResultListFilters,
+  updatePublishSettings,
+  setDocumentStep,
+  requestPublishConfirm,
+  renameActiveProject,
 }: ExecuteChatCommandParams): ExecuteChatCommandResult => {
   const renameTo = extractModelName(input);
   const { wantsExcel, wantsCsv } = detectExportIntent(input);
@@ -698,6 +1083,22 @@ export const executeChatCommand = ({
   const gradeDeleteIntent = /(等级|评分等级)/.test(input) && /(删除|移除|去掉|取消)/.test(input);
   const gradeUpdateIntent = /(等级|级)/.test(input) && /(改为|设为|调整为|设置为)/.test(input);
   const publicWeightIntent = /(公共信用综合评价|公共信用评价|公共信用).*(权重|占比|比例)/.test(input);
+  const workflowIntent =
+    /(验算|试算|校验|跑批|结果分析|企业列表|ks|分布|发布|确认发布|正式发布|管理办法|文档|生效日期|有效期|版本号|样本|样本量|抽样|数据源|行业|筛选|过滤|只看|仅看|否决项|加分项|等级筛选|评级筛选|北京市|供热企业)/i.test(
+      input,
+    );
+  const isFilterControlText = /(筛选|过滤|只看|仅看)/.test(input);
+  const bonusDeleteIntentSafe = bonusDeleteIntent && !isFilterControlText;
+  const vetoDeleteIntentSafe = vetoDeleteIntent && !isFilterControlText;
+  const hasModelRuleIntent =
+    bonusAddIntent ||
+    bonusDeleteIntentSafe ||
+    vetoAddIntent ||
+    vetoDeleteIntentSafe ||
+    gradeAddIntent ||
+    gradeDeleteIntent ||
+    gradeUpdateIntent ||
+    publicWeightIntent;
 
   if (
     !renameTo &&
@@ -706,18 +1107,26 @@ export const executeChatCommand = ({
     !scoreModeTo &&
     !publicCreditWeightTo &&
     !bonusAddIntent &&
-    !bonusDeleteIntent &&
+    !bonusDeleteIntentSafe &&
     !vetoAddIntent &&
-    !vetoDeleteIntent &&
+    !vetoDeleteIntentSafe &&
     !gradeAddIntent &&
     !gradeDeleteIntent &&
     !gradeUpdateIntent &&
-    !publicWeightIntent
+    !publicWeightIntent &&
+    !workflowIntent
   ) {
     return { handled: false };
   }
 
   if (!modelSnapshot) {
+    if (renameTo) {
+      renameActiveProject(renameTo);
+      return {
+        handled: true,
+        reply: `已记录模型名称为「${renameTo}」，将在模型构建后自动应用。`,
+      };
+    }
     return {
       handled: true,
       reply: '当前还没有可操作的模型，请先发送“开始构建指标体系”生成模型后再执行该指令。',
@@ -729,6 +1138,7 @@ export const executeChatCommand = ({
 
   if (renameTo) {
     nextModel = { ...nextModel, modelName: renameTo };
+    renameActiveProject(renameTo);
     doneActions.push(`已将模型名称修改为「${renameTo}」`);
   }
 
@@ -808,23 +1218,46 @@ export const executeChatCommand = ({
     doneActions.push(...updateGradeResult.replies);
   }
 
+  const workflowResult = handleWorkflowCommands(input, {
+    currentPhase,
+    setPhase,
+    validationStep,
+    setValidationStep,
+    updateValidationSettings,
+    setResultActiveTab,
+    updateResultListFilters,
+    resetResultListFilters,
+    updatePublishSettings,
+    setDocumentStep,
+    requestPublishConfirm,
+  });
+  if (workflowResult.matchedAny) {
+    doneActions.push(...workflowResult.replies);
+  }
+
   if (nextModel !== modelSnapshot) {
     setModelSnapshot(nextModel);
   }
 
   if (
     doneActions.length === 0 &&
-    (
-      bonusAddIntent ||
-      bonusDeleteIntent ||
-      vetoAddIntent ||
-      vetoDeleteIntent ||
-      gradeAddIntent ||
-      gradeDeleteIntent ||
-      gradeUpdateIntent ||
-      publicWeightIntent
-    )
+    (hasModelRuleIntent || workflowIntent)
   ) {
+    if (workflowIntent && !hasModelRuleIntent) {
+      return {
+        handled: true,
+        reply:
+          '我识别到了流程控制意图，但缺少关键信息。示例：\n' +
+          '1) 开始验算\n' +
+          '2) 验算样本量改为300\n' +
+          '3) 验算行业改为环境保护\n' +
+          '4) 切到企业列表\n' +
+          '5) 只看有否决项企业\n' +
+          '6) 使用北京市95家供热企业样本\n' +
+          '7) 版本号改为V1.2，生效日期改为2026-04-01，有效期2年\n' +
+          '8) 进入管理办法并预览文档',
+      };
+    }
     return {
       handled: true,
       reply:
@@ -857,6 +1290,9 @@ export const executeChatCommand = ({
 };
 
 export const shouldConfirmDeleteCommand = (input: string) => {
+  if (/(筛选|过滤)/.test(input)) {
+    return false;
+  }
   const patterns = [
     /(删除|移除|去掉|取消).*(加分项|加分规则|否决项|否决规则|一票否决|等级|评分等级|指标)/,
     /(加分项|加分规则|否决项|否决规则|一票否决|等级|评分等级|指标).*(删除|移除|去掉|取消)/,

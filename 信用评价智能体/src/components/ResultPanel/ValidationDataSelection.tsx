@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useAgentStore } from '../../store';
 import { Button, Checkbox, InputNumber, Radio, Select } from 'antd';
+import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import { Database, UploadCloud, Download, Calculator, Building, Filter, CheckCircle2 } from 'lucide-react';
+import { BEIJING_HEATING_VALIDATION_DATASET } from '../../mock/beijing-heating-data';
 
-const INDUSTRIES = ['交通运输', '环境保护', '养老服务', '家政服务', '医疗健康', '教育培训'];
+const INDUSTRIES = ['交通运输', '环境保护', '公共事业', '养老服务', '家政服务', '医疗健康', '教育培训'];
 const ENTERPRISE_SCALES = [
   { label: '超大', value: '超大', weight: 5 },
   { label: '大型', value: '大型', weight: 15 },
@@ -32,14 +34,14 @@ export const ValidationDataSelection: React.FC = () => {
   const updateSettings = useAgentStore((state) => state.updateValidationSettings);
   const setValidationStep = useAgentStore((state) => state.setValidationStep);
 
-  const [hasImported, setHasImported] = useState(false);
+  const hasImported = settings.mode === 'import' && settings.importedRecordCount > 0;
 
   const activeOptions = getActiveOptions(settings.selectedAttributeCombo);
   
   const isAllSelected = activeOptions.length > 0 && settings.selectedAttributeValues.length === activeOptions.length;
   const isIndeterminate = settings.selectedAttributeValues.length > 0 && settings.selectedAttributeValues.length < activeOptions.length;
 
-  const onSelectAllChange = (e: any) => {
+  const onSelectAllChange = (e: CheckboxChangeEvent) => {
     updateSettings({
       selectedAttributeValues: e.target.checked ? activeOptions.map(opt => opt.value) : [],
     });
@@ -90,7 +92,14 @@ export const ValidationDataSelection: React.FC = () => {
             <div className="w-full flex p-1 bg-gray-100 rounded-xl">
               <button
                 type="button"
-                onClick={() => updateSettings({ mode: 'database' })}
+                onClick={() =>
+                  updateSettings({
+                    mode: 'database',
+                    importedDatasetId: null,
+                    importedFileName: '',
+                    importedRecordCount: 0,
+                  })
+                }
                 className={`flex-1 flex justify-center items-center py-2 px-3 text-sm gap-2 rounded-lg transition-all duration-200 ${settings.mode === 'database' ? 'bg-white text-blue-600 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
               >
                 <Database size={16} /> 湖仓随机抽样
@@ -216,8 +225,19 @@ export const ValidationDataSelection: React.FC = () => {
                    支持 .xlsx, .csv 格式。包含了企业统一信用代码、名称及各类基础经营数据字段。
                  </p>
                  <div className="flex items-center gap-3">
-                   <Button onClick={() => setHasImported(true)} type="primary" className="bg-blue-600 shadow-sm">
-                     模拟选择文件
+                   <Button
+                     onClick={() =>
+                       updateSettings({
+                         importedDatasetId: BEIJING_HEATING_VALIDATION_DATASET.id,
+                         importedFileName: BEIJING_HEATING_VALIDATION_DATASET.fileName,
+                         importedRecordCount: BEIJING_HEATING_VALIDATION_DATASET.enterprises.length,
+                         sampleCount: BEIJING_HEATING_VALIDATION_DATASET.enterprises.length,
+                       })
+                     }
+                     type="primary"
+                     className="bg-blue-600 shadow-sm"
+                   >
+                     使用北京市供热企业名单（95家）
                    </Button>
                    <Button icon={<Download size={14}/>} variant="outlined" className="text-gray-600">
                      下载模板
@@ -229,8 +249,12 @@ export const ValidationDataSelection: React.FC = () => {
                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
                    <CheckCircle2 className="text-green-500 mt-0.5" size={18} />
                    <div className="flex flex-col">
-                     <span className="font-medium text-green-800 text-sm">已成功读取数据文件 (data_eval_samples_2025.xlsx)</span>
-                     <span className="text-green-700 text-xs mt-1 opacity-80">共识别出有效企业数据主体：5,321 条</span>
+                     <span className="font-medium text-green-800 text-sm">
+                       已成功读取数据文件 ({settings.importedFileName || '北京市热力公司(95).xlsx'})
+                     </span>
+                     <span className="text-green-700 text-xs mt-1 opacity-80">
+                       共识别出有效企业主体：{settings.importedRecordCount || 0} 条
+                     </span>
                    </div>
                  </div>
                )}
@@ -245,7 +269,9 @@ export const ValidationDataSelection: React.FC = () => {
              {settings.mode === 'database' ? (
                `当前条件在总库中预计匹配 ${(settings.sampleCount * 3.5).toFixed(0)} 家潜在企业，将随机抽取 ${settings.sampleCount} 家。`
              ) : (
-               hasImported ? '将使用本地上传名单执行验算。' : '请先上传数据文件。'
+               hasImported
+                 ? `将使用本地上传名单执行验算（${settings.importedRecordCount} 家）。`
+                 : '请先上传或选择数据文件。'
              )}
            </div>
            <Button 
