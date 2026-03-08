@@ -1,0 +1,86 @@
+import React from 'react';
+import { Send } from 'lucide-react';
+import { Modal } from 'antd';
+import FileUpload from './FileUpload';
+import { useInputArea } from './hooks';
+
+const InputArea: React.FC = () => {
+  const {
+    text,
+    setText,
+    setIsComposing,
+    isTyping,
+    pendingDeleteQuery,
+    handleConfirmDeleteCommand,
+    handleCancelDeleteCommand,
+    handleSend,
+    handleKeyDown
+  } = useInputArea();
+
+  return (
+    <div className="flex flex-col gap-2 relative bg-white pb-4 px-4">
+      <Modal
+        title="确认执行删除操作？"
+        open={!!pendingDeleteQuery}
+        centered
+        onOk={handleConfirmDeleteCommand}
+        onCancel={handleCancelDeleteCommand}
+        okText="确认删除"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+        maskClosable={false}
+      >
+        <div className="text-sm text-gray-600 leading-6">
+          {pendingDeleteQuery ? `将执行指令：${pendingDeleteQuery}` : '该操作可能无法恢复，请确认是否继续。'}
+        </div>
+      </Modal>
+
+      <div className="flex flex-wrap items-center gap-2 py-2">
+        {[
+          '开始构建指标体系',
+          '把模型名字改为交通运输信用评价模型',
+          '改为千分制',
+          '增加加分项 获得国家级奖项 +8分',
+          '增加否决项 发生重大安全事故',
+          '把公共信用综合评价占比改为20%',
+          '把A等级分值改为85',
+          '帮我把模型转为Excel表格输出',
+          '我要验算模型',
+        ].map((cmd) => (
+          <button 
+            key={cmd}
+            className="text-xs bg-blue-50/80 border border-blue-100 text-blue-600 px-3 py-1.5 rounded-full hover:bg-blue-100 transition-colors"
+            onClick={() => setText(cmd)}
+          >
+            {cmd}
+          </button>
+        ))}
+      </div>
+      
+      <div className="relative flex items-end shadow-sm rounded-xl border border-gray-200 bg-gray-50/50 focus-within:border-blue-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-blue-500 overflow-hidden transition-all duration-200">
+        <div className="p-2 shrink-0">
+          <FileUpload />
+        </div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onCompositionStart={() => setIsComposing(true)}
+          onCompositionEnd={() => setIsComposing(false)}
+          placeholder="输入需求指令或描述，Shift+Enter换行..."
+          className="w-full resize-none bg-transparent py-3 -ml-2 text-sm text-gray-800 outline-none placeholder:text-gray-400"
+          rows={Math.max(2, Math.min(text.split('\n').length, 5))}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!text.trim() || isTyping}
+          className="m-2 p-[10px] shrink-0 rounded-lg bg-blue-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors shadow-sm"
+        >
+          <Send size={18} className={isTyping ? 'animate-pulse' : ''} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default InputArea;
