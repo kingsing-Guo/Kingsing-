@@ -43,3 +43,5 @@ npm run build
 3. API 对接：替换 Mock（AI/目录/主体/模型管理/发布）
 
 PRD 路径：`docs/prd/prd-2025-03-07-credit-eval-agent.md`
+
+实现计划（知识库与数据飞轮）：`docs/plan/implementation-plan-knowledge-base-flywheel.md`
